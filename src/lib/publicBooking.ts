@@ -1,0 +1,202 @@
+import { supabase } from './supabase'
+
+export interface PublicDoctor {
+  id: string
+  first_name: string
+  last_name: string
+  specialty: string
+  bio: string
+  phone: string
+  email: string
+  address: string
+  city: string
+  work_days: string[]
+  work_from: string
+  work_to: string
+  session_duration: number
+  price_particular: number
+  booking_code: string
+  avatar_url: string | null
+}
+
+export interface DaySlots {
+  date: string
+  dayLabel: string
+  slots: string[]
+}
+
+export async function getDoctorByBookingCode(code: string): Promise<PublicDoctor | null> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name, specialty, bio, phone, email, address, city, work_days, work_from, work_to, session_duration, price_particular, booking_code, avatar_url')
+    .eq('booking_code', code)
+    .single()
+  return data
+}
+
+const dayMap: Record<number, string> = { 0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb' }
+const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+const weekdayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+export function formatDayLabel(date: Date): string {
+  return `${weekdayNames[date.getDay()]} ${String(date.getDate()).padStart(2, '0')} ${monthNames[date.getMonth()]}`
+}
+
+function toLocalISO(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export async function getAvailableSlotsRange(doctorId: string, daysAhead = 14): Promise<DaySlots[]> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const fromISO = toLocalISO(today)
+  const endDate = new Date(today)
+  endDate.setDate(endDate.getDate() + daysAhead)
+  const toISO = toLocalISO(endDate)
+
+  // Get doctor config
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('work_days, work_from, work_to, session_duration')
+    .eq('id', doctorId)
+    .single()
+  if (!profile) return []
+
+  // Get booked appointments
+  const { data: appointments } = await supabase
+    .from('appointments')
+    .select('date, time, status')
+    .eq('doctor_id', doctorId)
+    .gte('date', fromISO)
+    .lte('date', toISO)
+
+  // Get date blocks
+  const { data: blocks } = await supabase
+    .from('date_blocks')
+    .select('from_date, to_date')
+    .eq('doctor_id', doctorId)
+
+  const blockedDates = new Set<string>()
+  for (const b of blocks || []) {
+    const start = new Date(b.from_date + 'T12:00:00')
+    const end = new Date(b.to_date + 'T12:00:00')
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      blockedDates.add(d.toISOString().split('T')[0])
+    }
+  }
+
+  const bookedByDate: Record<string, Set<string>> = {}
+  for (const a of appointments || []) {
+    if (a.status === 'cancelado') continue
+    const key = a.date
+    if (!bookedByDate[key]) bookedByDate[key] = new Set()
+    bookedByDate[key].add(String(a.time).slice(0, 5))
+  }
+
+  const workDays = profile.work_days || ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
+  const duration = profile.session_duration || 50
+  const [startH, startM] = String(profile.work_from || '09:00').slice(0, 5).split(':').map(Number)
+  const [endH, endM] = String(profile.work_to || '18:00').slice(0, 5).split(':').map(Number)
+  const startMin = startH * 60 + startM
+  const endMin = endH * 60 + endM
+
+  const result: DaySlots[] = []
+  const now = new Date()
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const todayStr = now.toISOString().split('T')[0]
+
+  for (let i = 0; i < daysAhead; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() + i)
+    const iso = d.toISOString().split('T')[0]
+
+    if (blockedDates.has(iso)) continue
+    if (!workDays.includes(dayMap[d.getDay()])) continue
+
+    const booked = bookedByDate[iso] || new Set()
+    const slots: string[] = []
+
+    for (let m = startMin; m + duration <= endMin; m += duration) {
+      // Skip past times today
+      if (iso === todayStr && m <= nowMin + 30) continue
+      const h = Math.floor(m / 60)
+      const mn = m % 60
+      const time = `${String(h).padStart(2, '0')}:${String(mn).padStart(2, '0')}`
+      if (!booked.has(time)) {
+        slots.push(time)
+      }
+    }
+
+    if (slots.length > 0) {
+      result.push({ date: iso, dayLabel: formatDayLabel(d), slots })
+    }
+  }
+
+  return result
+}
+
+export interface BookingRequest {
+  doctorId: string
+  date: string
+  time: string
+  duration: string
+  firstName: string
+  lastName: string
+  dni: string
+  phone: string
+  email?: string
+  insurance?: string
+}
+
+export async function createBooking(req: BookingRequest): Promise<{ success: boolean; error?: string }> {
+  // Check if patient exists for this doctor
+  const { data: existingPatient } = await supabase
+    .from('patients')
+    .select('id')
+    .eq('doctor_id', req.doctorId)
+    .eq('phone', req.phone)
+    .maybeSingle()
+
+  let patientId = existingPatient?.id
+
+  if (!patientId) {
+    const { data: newPatient, error: patientErr } = await supabase
+      .from('patients')
+      .insert({
+        doctor_id: req.doctorId,
+        name: `${req.firstName} ${req.lastName}`,
+        phone: req.phone,
+        email: req.email || null,
+        dni: req.dni,
+        insurance: req.insurance || 'Particular',
+        since: `Paciente desde ${new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`,
+        total_sessions: 0,
+        tags: [],
+      })
+      .select('id')
+      .single()
+    if (patientErr || !newPatient) {
+      return { success: false, error: patientErr?.message || 'No se pudo crear el paciente' }
+    }
+    patientId = newPatient.id
+  }
+
+  const { error: aptErr } = await supabase
+    .from('appointments')
+    .insert({
+      doctor_id: req.doctorId,
+      patient_id: patientId,
+      date: req.date,
+      time: req.time,
+      duration: req.duration,
+      patient_name: `${req.firstName} ${req.lastName}`,
+      detail: 'Turno solicitado desde la página pública',
+      status: 'pendiente',
+    })
+
+  if (aptErr) return { success: false, error: aptErr.message }
+  return { success: true }
+}

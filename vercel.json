@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/p/:code", "destination": "/" },
+    { "source": "/(.*)", "destination": "/" }
+  ]
+}

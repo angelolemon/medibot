@@ -1,0 +1,247 @@
+{
+  "name": "MediBot WhatsApp Bot",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "📌 MediBot WhatsApp Bot",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, -200],
+      "parameters": {
+        "content": "## MediBot WhatsApp Bot\n\n**Flujo:**\n1. Meta envia mensaje del paciente al webhook\n2. Se extrae el numero y texto del mensaje\n3. Se envia al bot de Supabase para procesar\n4. La respuesta se envia de vuelta al paciente por WhatsApp\n\n**Configurar:**\n- Reemplaza WHATSAPP_ACCESS_TOKEN en el nodo 'Send WhatsApp reply'\n- Reemplaza PHONE_NUMBER_ID en la URL del mismo nodo\n- En Meta, configura el webhook URL que genera este workflow\n- Suscribite al campo 'messages'"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000010",
+      "name": "Receive WhatsApp webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "webhookId": "medibot-whatsapp",
+      "parameters": {
+        "path": "medibot-whatsapp",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000020",
+      "name": "Check if verification or message",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-hub-mode",
+              "leftValue": "={{ $json.query?.['hub.mode'] }}",
+              "rightValue": "subscribe",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000025",
+      "name": "Respond with verification challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [440, -150],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $('Receive WhatsApp webhook').first().json.query['hub.challenge'] }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000030",
+      "name": "Extract message from webhook",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 150],
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst entry = input.body?.entry?.[0];\nconst change = entry?.changes?.[0];\nconst message = change?.value?.messages?.[0];\n\nif (!message || !message.text) {\n  return [{ json: { skip: true } }];\n}\n\nreturn [{\n  json: {\n    skip: false,\n    from: message.from,\n    body: message.text.body,\n    messageId: message.id,\n    timestamp: message.timestamp\n  }\n}];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000035",
+      "name": "Check if valid text message",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 150],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-skip",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000040",
+      "name": "Send to MediBot Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://wyrpnsszzlzhvhxtwlzg.supabase.co/functions/v1/whatsapp-bot",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: $json.from, body: $json.body }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000050",
+      "name": "Send WhatsApp reply to patient",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v21.0/1129164866943441/messages",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: $('Extract message from webhook').first().json.from, type: 'text', text: { body: $json.reply?.body || 'Error procesando mensaje' } }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <REEMPLAZAR_CON_TU_TOKEN>"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000060",
+      "name": "Respond OK to Meta",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 0],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000070",
+      "name": "Respond OK (skip non-text)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'ok' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive WhatsApp webhook": {
+      "main": [
+        [
+          { "node": "Check if verification or message", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check if verification or message": {
+      "main": [
+        [
+          { "node": "Respond with verification challenge", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Extract message from webhook", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Extract message from webhook": {
+      "main": [
+        [
+          { "node": "Check if valid text message", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check if valid text message": {
+      "main": [
+        [
+          { "node": "Send to MediBot Supabase", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Respond OK (skip non-text)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Send to MediBot Supabase": {
+      "main": [
+        [
+          { "node": "Send WhatsApp reply to patient", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Send WhatsApp reply to patient": {
+      "main": [
+        [
+          { "node": "Respond OK to Meta", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
