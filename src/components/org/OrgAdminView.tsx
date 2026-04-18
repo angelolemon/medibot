@@ -27,29 +27,36 @@ export default function OrgAdminView({ org, userId, onOrgUpdated }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-bg">
-      <div className="p-6 sm:p-8 overflow-y-auto flex-1 pb-20 lg:pb-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg">
+      <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10">
+        <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
           <div>
-            <h1 className="text-[36px] sm:text-[44px] font-bold text-text leading-[1.05] tracking-tight">{org.name}</h1>
-            <p className="text-[14px] text-text-muted mt-2">Administrar organización.</p>
+            <h1 className="text-[36px] sm:text-[44px] font-normal text-text leading-[1.05] tracking-[-0.03em] m-0" style={{ fontFamily: 'var(--font-serif)' }}>
+              {org.name}<span className="text-primary">.</span>
+            </h1>
+            <p className="text-[13px] text-text-muted mt-2">Administrar organización · {members.length} {members.length === 1 ? 'miembro' : 'miembros'}.</p>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-white border border-gray-border rounded-full p-1 w-fit">
-          {(['members', 'invites', 'marca'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-full text-[13px] cursor-pointer transition-colors ${
-                tab === t ? 'bg-primary text-white font-medium' : 'text-text-muted hover:text-text'
-              }`}
-            >
-              {t === 'members' ? `Miembros (${members.length})` : t === 'invites' ? 'Invitaciones' : 'Marca'}
-            </button>
-          ))}
+        {/* Tabs — serif italic underline */}
+        <div className="flex gap-6 border-b border-gray-border mb-6">
+          {(['members', 'invites', 'marca'] as const).map((t) => {
+            const active = tab === t
+            return (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`pb-2.5 pt-1 text-[15px] cursor-pointer transition-colors -mb-px border-b-2 ${
+                  active
+                    ? 'border-primary text-text italic'
+                    : 'border-transparent text-text-hint hover:text-text'
+                }`}
+                style={{ fontFamily: 'var(--font-serif)' }}
+              >
+                {t === 'members' ? `Miembros (${members.length})` : t === 'invites' ? 'Invitaciones' : 'Marca'}
+              </button>
+            )
+          })}
         </div>
 
         {tab === 'members' && (

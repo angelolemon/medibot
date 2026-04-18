@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useBotTemplates } from '../../lib/hooks'
+import PageHeader from '../PageHeader'
 
 interface TemplateConfig {
   key: string
@@ -171,30 +172,39 @@ export default function BotConfigView() {
   const [activeTab, setActiveTab] = useState<typeof categories[number]>('turnos')
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-bg">
-      <div className="p-6 sm:p-8 overflow-y-auto flex-1 pb-20 lg:pb-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
-          <div>
-            <h1 className="text-[36px] sm:text-[44px] font-bold text-text leading-[1.05] tracking-tight">WhatsApp Bot</h1>
-            <p className="text-[14px] text-text-muted mt-2">Personalizá los mensajes automáticos que reciben tus pacientes.</p>
-          </div>
-        </div>
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg">
+      <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10">
+        <PageHeader
+          title={
+            <>
+              WhatsApp Bot.
+              <span className="inline-block align-middle ml-3 px-3 py-1 rounded-full text-[11px] font-semibold bg-teal text-surface uppercase tracking-wider" style={{ fontFamily: 'var(--font-sans)' }}>
+                activo
+              </span>
+            </>
+          }
+          subtitle="Los pacientes reservan, confirman y cancelan por WhatsApp. Personalizá las plantillas."
+        />
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-white border border-gray-border rounded-full p-1 w-fit">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveTab(cat)}
-              className={`px-4 py-2 rounded-full text-[13px] cursor-pointer transition-colors flex items-center gap-1.5 ${
-                activeTab === cat ? 'bg-primary text-white font-medium' : 'text-text-muted hover:text-text'
-              }`}
-            >
-              <span className="text-sm">{categoryIcons[cat]}</span>
-              {categoryLabels[cat]}
-            </button>
-          ))}
+        {/* Tabs — serif italic underline style */}
+        <div className="flex gap-6 border-b border-gray-border mb-6">
+          {categories.map((cat) => {
+            const active = activeTab === cat
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveTab(cat)}
+                className={`pb-2.5 pt-1 text-[15px] cursor-pointer transition-colors -mb-px border-b-2 ${
+                  active
+                    ? 'border-primary text-text italic'
+                    : 'border-transparent text-text-hint hover:text-text'
+                }`}
+                style={{ fontFamily: 'var(--font-serif)' }}
+              >
+                {categoryLabels[cat]}
+              </button>
+            )
+          })}
         </div>
         {/* Variables */}
         <div className="bg-white border border-gray-border rounded-[16px] p-4 mb-6">

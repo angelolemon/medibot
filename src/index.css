@@ -1,27 +1,72 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #3C3489;
-  --color-primary-light: #EEEDFE;
-  --color-primary-mid: #AFA9EC;
-  --color-teal: #0F6E56;
-  --color-teal-light: #E1F5EE;
-  --color-coral: #993C1D;
-  --color-coral-light: #FAECE7;
-  --color-amber: #633806;
-  --color-amber-light: #FAEEDA;
-  --color-gray-bg: #F7F7F5;
-  --color-gray-border: rgba(0,0,0,0.1);
-  --color-text: #1a1a1a;
-  --color-text-muted: #666666;
-  --color-text-hint: #999999;
+  /* Clinical Calm palette — bone + sage */
+  --color-primary: #3B4A38;          /* deep sage (was purple #3C3489) */
+  --color-primary-light: #ECEFE8;
+  --color-primary-mid: #B7C0B0;
+
+  --color-teal: #4F7565;             /* softened */
+  --color-teal-light: #E5EDE7;
+  --color-coral: #A24A32;            /* softened */
+  --color-coral-light: #F2E2DA;
+  --color-amber: #8A5A1E;
+  --color-amber-light: #F1E4CD;
+
+  /* Surfaces */
+  --color-bg: #F5F2EC;               /* bone */
+  --color-gray-bg: #F5F2EC;          /* alias for bone bg */
+  --color-surface: #FFFFFF;
+  --color-surface-2: #FAF7F1;        /* cream */
+  --color-gray-border: #E8E2D4;      /* sand line */
+  --color-gray-border-2: #D4CCBD;    /* sand line darker */
+
+  /* Ink scale */
+  --color-text: #1A1815;             /* near-black brown */
+  --color-text-muted: #55504A;       /* ink2 */
+  --color-text-hint: #8A847C;        /* ink3 */
+  --color-text-dim: #B8B1A6;         /* ink4 */
+
+  /* Typography */
+  --font-serif: "Newsreader", Georgia, serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: var(--color-gray-bg);
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
   color: var(--color-text);
   font-size: 14px;
   min-height: 100vh;
-  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--color-primary-mid);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-gray-border-2);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-dim);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track { background: transparent; }
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
 }

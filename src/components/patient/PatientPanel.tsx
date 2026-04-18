@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { Appointment } from '../../data/appointments'
+import Icon from '../Icon'
+import Btn from '../Btn'
 
 interface Props {
   appointment: Appointment | null
@@ -17,19 +19,20 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
   const [showBlockConfirm, setShowBlockConfirm] = useState(false)
   const [blockFrom, setBlockFrom] = useState('09:00')
   const [blockTo, setBlockTo] = useState('13:00')
+
   // Selected turno: show patient detail
   if (appointment) {
     if (appointment.status === 'libre') {
       return (
         <Panel>
-          <PanelHeader>Horario libre</PanelHeader>
-          <div className="px-[18px] py-4 flex-1">
-            <p className="text-[13px] text-[#bbb] mt-4">
+          <div className="p-6">
+            <Eyebrow>Horario libre</Eyebrow>
+            <p className="text-[13px] text-text-muted mt-3 leading-[1.55]">
               Este horario está disponible para reservas desde el bot de WhatsApp.
             </p>
-            <button className="mt-4 w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-[7px] rounded-md text-[13px] cursor-pointer border border-gray-border bg-white text-text hover:bg-gray-bg transition-colors">
-              🚫 Bloquear horario
-            </button>
+            <Btn className="mt-4 w-full justify-center" style={{ width: '100%' }}>
+              <Icon name="block" size={13} /> Bloquear horario
+            </Btn>
           </div>
         </Panel>
       )
@@ -47,60 +50,128 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
       tags: [] as string[],
       history: [] as { date: string; text: string }[],
     }
+
     return (
       <Panel>
-        <PanelHeader>{patient.name}</PanelHeader>
-        <div className="px-[18px] py-4 flex-1 overflow-y-auto">
-          <Field label="Teléfono" value={patient.phone || '—'} isLink />
-          <Field label="Edad" value={patient.age || '—'} />
-          <Field label="Vínculo" value={patient.since || '—'} />
-
-          <div className="mb-3.5">
-            <div className="text-[11px] text-text-hint uppercase tracking-wide mb-1">Etiquetas</div>
-            <div className="flex flex-wrap gap-1">
-              {(patient.tags || []).map((tag) => (
-                <span key={tag} className="inline-block text-[11px] px-2 py-0.5 rounded-full bg-primary-light text-primary">
-                  {tag}
-                </span>
-              ))}
+        <div className="p-6 flex-1 overflow-y-auto">
+          {/* Patient header */}
+          <div className="flex items-center gap-3.5 mb-5">
+            <div
+              className="w-[52px] h-[52px] rounded-full bg-primary-light text-primary grid place-items-center text-[18px] shrink-0"
+              style={{ fontFamily: 'var(--font-serif)' }}
+            >
+              {patient.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            </div>
+            <div className="min-w-0">
+              <div
+                className="text-[20px] tracking-[-0.02em] leading-[1.15] text-text"
+                style={{ fontFamily: 'var(--font-serif)' }}
+              >
+                {patient.name}
+              </div>
+              <div className="text-[11px] text-text-hint mt-[3px]" style={{ fontFamily: 'var(--font-mono)' }}>
+                {patient.age || '—'} {patient.since && `· desde ${patient.since}`}
+              </div>
             </div>
           </div>
 
-          <div className="mb-3.5">
-            <div className="text-[11px] text-text-hint uppercase tracking-wide mb-2">
-              Historial de sesiones
+          {/* Info pills */}
+          <div className="grid grid-cols-2 gap-2 mb-[18px]">
+            <InfoPill label="Obra social" value={patient.insurance || '—'} />
+            <InfoPill label="Sesiones" value={String(patient.totalSessions ?? 0)} />
+          </div>
+
+          {/* Next appointment */}
+          <div className="p-[14px] bg-primary-light rounded-[10px] mb-[18px]">
+            <div
+              className="text-[10px] text-primary font-semibold uppercase tracking-[0.12em]"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              Turno actual
             </div>
+            <div
+              className="text-[18px] mt-1 tracking-[-0.015em] text-text"
+              style={{ fontFamily: 'var(--font-serif)' }}
+            >
+              {appointment.time} · {appointment.duration}
+            </div>
+            {appointment.detail && (
+              <div className="text-[12px] text-text-muted mt-1">{appointment.detail}</div>
+            )}
+          </div>
+
+          {/* Contact */}
+          {(patient.phone || patient.email) && (
+            <div className="mb-[18px]">
+              <Eyebrow style={{ marginBottom: 8 }}>Contacto</Eyebrow>
+              <div className="text-[12px] text-text-muted leading-[1.7]">
+                {patient.phone && (
+                  <div className="flex items-center gap-2">
+                    <Icon name="phone" size={12} style={{ color: 'var(--color-text-hint)' }} />
+                    {patient.phone}
+                  </div>
+                )}
+                {patient.email && (
+                  <div className="flex items-center gap-2">
+                    <Icon name="email" size={12} style={{ color: 'var(--color-text-hint)' }} />
+                    {patient.email}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tags */}
+          {(patient.tags || []).length > 0 && (
+            <div className="mb-[18px]">
+              <Eyebrow style={{ marginBottom: 8 }}>Etiquetas</Eyebrow>
+              <div className="flex flex-wrap gap-1.5">
+                {(patient.tags || []).map((tag) => (
+                  <span key={tag} className="inline-block text-[11px] px-[9px] py-[2px] rounded-full bg-primary-light text-primary font-medium">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* History */}
+          <div>
+            <Eyebrow style={{ marginBottom: 10 }}>
+              Historial · {patient.history?.length ?? 0}
+            </Eyebrow>
             {(!patient.history || patient.history.length === 0) ? (
-              <div className="text-xs text-[#bbb]">Sin historial previo</div>
+              <div className="text-xs text-text-hint">Sin historial previo</div>
             ) : (
               patient.history.map((h, i) => (
                 <div
                   key={i}
-                  className={`py-2 text-xs text-text-muted ${
-                    i < patient.history.length - 1 ? 'border-b border-gray-border' : ''
-                  }`}
+                  className={`py-[10px] ${i > 0 ? 'border-t border-gray-border' : ''}`}
                 >
-                  <div className="text-[11px] text-text-hint">{h.date}</div>
-                  {h.text}
+                  <div className="text-[10px] text-text-hint" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {h.date}
+                  </div>
+                  <div className="text-[12px] text-text-muted mt-1 leading-[1.55]">{h.text}</div>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        <div className="px-[18px] py-3.5 border-t border-gray-border flex gap-2 shrink-0">
-          <button className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-[7px] rounded-md text-xs cursor-pointer border border-primary bg-primary text-white hover:bg-[#534AB7] transition-colors">
-            📤 Enviar indicaciones
-          </button>
-          <button className="inline-flex items-center justify-center px-3 py-[7px] rounded-md text-xs cursor-pointer border border-gray-border bg-white text-text-muted hover:bg-gray-bg transition-colors">
-            💬
-          </button>
+        {/* Footer actions */}
+        <div className="p-4 border-t border-gray-border flex gap-2 shrink-0">
+          <Btn variant="primary" className="flex-1" style={{ flex: 1, justifyContent: 'center' }}>
+            <Icon name="send" size={12} /> Enviar indicaciones
+          </Btn>
+          <Btn>
+            <Icon name="chat" size={13} />
+          </Btn>
         </div>
       </Panel>
     )
   }
 
-  // No turno selected: show day summary
+  // No turno selected: day summary
   const total = dayAppointments.length
   const withPatient = dayAppointments.filter((a) => a.status !== 'libre')
   const pacientes = new Set(withPatient.map((a) => a.patientName).filter(Boolean)).size
@@ -112,9 +183,7 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
   const sorted = [...dayAppointments].sort((a, b) => a.time.localeCompare(b.time))
   const firstTime = sorted[0]?.time ?? '—'
   const lastAppt = sorted[sorted.length - 1]
-  const lastTime = lastAppt ? lastAppt.time : '—'
 
-  // Calculate end time of last appointment
   let endTime = '—'
   if (lastAppt) {
     const [h, m] = lastAppt.time.split(':').map(Number)
@@ -127,28 +196,33 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
 
   return (
     <Panel>
-      <PanelHeader>Resumen del día</PanelHeader>
-      <div className="px-[18px] py-4 flex-1 overflow-y-auto">
-        <div className="text-xs text-text-hint mb-4 uppercase tracking-wide">{dayLabel}</div>
+      <div className="p-6 flex-1 overflow-y-auto">
+        <Eyebrow>Resumen del día</Eyebrow>
+        <div
+          className="text-[22px] mt-1 mb-5 tracking-[-0.02em] text-text capitalize"
+          style={{ fontFamily: 'var(--font-serif)' }}
+        >
+          {dayLabel}
+        </div>
 
         {isBlocked && (
-          <div className="flex items-center gap-2 bg-coral-light rounded-lg px-3 py-2.5 mb-4">
-            <span className="text-sm">🏖️</span>
+          <div className="flex items-center gap-2.5 bg-coral-light rounded-[10px] px-3.5 py-3 mb-4">
+            <Icon name="block" size={14} style={{ color: 'var(--color-coral)' }} />
             <div>
               <div className="text-xs font-medium text-coral">{blockReason ?? 'Bloqueado'}</div>
-              <div className="text-[10px] text-coral/70">No se aceptan turnos</div>
+              <div className="text-[10px] text-coral opacity-75">No se aceptan turnos</div>
             </div>
           </div>
         )}
 
         {total === 0 && !isBlocked ? (
-          <p className="text-[13px] text-[#bbb]">No hay turnos agendados para este día.</p>
+          <p className="text-[13px] text-text-hint">No hay turnos agendados para este día.</p>
         ) : total === 0 && isBlocked ? (
-          <p className="text-[13px] text-[#bbb]">Día sin turnos — bloqueado.</p>
+          <p className="text-[13px] text-text-hint">Día sin turnos — bloqueado.</p>
         ) : (
           <>
             {/* Quick stats */}
-            <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="grid grid-cols-2 gap-2 mb-5">
               <StatCard label="Pacientes" value={String(pacientes)} />
               <StatCard label="Turnos" value={String(total)} />
               <StatCard label="Inicio" value={firstTime} />
@@ -156,41 +230,51 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
             </div>
 
             {/* Status breakdown */}
-            <div className="mb-4">
-              <div className="text-[11px] text-text-hint uppercase tracking-wide mb-2">Estado de turnos</div>
-              <div className="space-y-1.5">
+            <div className="mb-5">
+              <Eyebrow style={{ marginBottom: 10 }}>Estado de turnos</Eyebrow>
+              <div className="space-y-2">
                 {confirmados > 0 && <StatusRow color="bg-teal" label="Confirmados" count={confirmados} />}
-                {pendientes > 0 && <StatusRow color="bg-[#EF9F27]" label="Pendientes" count={pendientes} />}
-                {cancelados > 0 && <StatusRow color="bg-[#E24B4A]" label="Cancelados" count={cancelados} />}
-                {libres > 0 && <StatusRow color="bg-[#D3D1C7]" label="Libres" count={libres} />}
+                {pendientes > 0 && <StatusRow color="bg-amber" label="Pendientes" count={pendientes} />}
+                {cancelados > 0 && <StatusRow color="bg-coral" label="Cancelados" count={cancelados} />}
+                {libres > 0 && <StatusRow color="bg-text-dim" label="Libres" count={libres} />}
               </div>
             </div>
 
             {/* Occupancy */}
-            <div className="mb-4">
-              <div className="text-[11px] text-text-hint uppercase tracking-wide mb-2">Ocupación</div>
-              <div className="w-full bg-gray-bg rounded-full h-2 mb-1">
+            <div className="mb-5">
+              <Eyebrow style={{ marginBottom: 10 }}>Ocupación</Eyebrow>
+              <div className="w-full bg-surface-2 rounded-full h-1.5 mb-2 border border-gray-border">
                 <div
-                  className="bg-primary h-2 rounded-full transition-all"
+                  className="bg-primary h-full rounded-full transition-all"
                   style={{ width: `${ocupacion}%` }}
                 />
               </div>
-              <div className="text-xs text-text-muted">{ocupacion}% de los turnos asignados</div>
+              <div className="text-[11px] text-text-muted" style={{ fontFamily: 'var(--font-mono)' }}>
+                {ocupacion}% asignados
+              </div>
             </div>
 
             {/* Patients list */}
-            <div className="mb-4">
-              <div className="text-[11px] text-text-hint uppercase tracking-wide mb-2">Pacientes del día</div>
-              {Array.from(new Set(withPatient.map((a) => a.patientName))).filter(Boolean).map((name) => {
+            <div>
+              <Eyebrow style={{ marginBottom: 10 }}>Pacientes del día</Eyebrow>
+              {Array.from(new Set(withPatient.map((a) => a.patientName))).filter(Boolean).map((name, i, arr) => {
                 const apt = withPatient.find((a) => a.patientName === name)!
                 return (
-                  <div key={name} className="flex items-center gap-2 py-1.5 border-b border-gray-border last:border-b-0">
-                    <div className="w-6 h-6 rounded-full bg-primary-light flex items-center justify-center text-[10px] font-semibold text-primary shrink-0">
-                      {name!.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  <div
+                    key={name}
+                    className={`flex items-center gap-2.5 py-2 ${i < arr.length - 1 ? 'border-b border-gray-border' : ''}`}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full bg-primary-light grid place-items-center text-[10px] text-primary shrink-0"
+                      style={{ fontFamily: 'var(--font-serif)' }}
+                    >
+                      {name!.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium truncate">{name}</div>
-                      <div className="text-[10px] text-text-hint">{apt.time}</div>
+                      <div className="text-[12px] font-medium truncate text-text">{name}</div>
+                    </div>
+                    <div className="text-[11px] text-text-hint" style={{ fontFamily: 'var(--font-mono)' }}>
+                      {apt.time}
                     </div>
                   </div>
                 )
@@ -200,25 +284,23 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
         )}
       </div>
 
-      {/* Footer: day actions */}
+      {/* Footer actions */}
       {isBlocked ? (
-        <div className="px-[18px] py-3.5 border-t border-gray-border shrink-0">
-          <button
-            onClick={onUnblock}
-            className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-[7px] rounded-md text-[13px] cursor-pointer border border-coral bg-white text-coral hover:bg-coral-light transition-colors"
-          >
+        <div className="p-4 border-t border-gray-border shrink-0">
+          <Btn variant="danger" onClick={onUnblock} style={{ width: '100%', justifyContent: 'center' }}>
             Desbloquear este período
-          </button>
+          </Btn>
         </div>
       ) : (
-        <div className="px-[18px] py-3.5 border-t border-gray-border shrink-0 flex flex-col gap-2">
+        <div className="p-4 border-t border-gray-border shrink-0 flex flex-col gap-2">
           {total > 0 && (
-            <button
-              onClick={() => alert(`Enviando recordatorio por WhatsApp a ${pacientes} pacientes...`)}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-[7px] rounded-md text-[13px] cursor-pointer border border-primary bg-primary text-white hover:bg-[#534AB7] transition-colors"
+            <Btn
+              variant="primary"
+              onClick={() => alert(`Enviando recordatorio a ${pacientes} pacientes...`)}
+              style={{ width: '100%', justifyContent: 'center' }}
             >
-              📲 Recordar a todos
-            </button>
+              <Icon name="send" size={13} /> Recordar a todos
+            </Btn>
           )}
 
           {showBlockForm ? (
@@ -236,12 +318,9 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
               onCancel={() => { setShowBlockForm(false); setShowBlockConfirm(false) }}
             />
           ) : (
-            <button
-              onClick={() => setShowBlockForm(true)}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-[7px] rounded-md text-[13px] cursor-pointer border border-gray-border bg-white text-text hover:bg-gray-bg transition-colors"
-            >
-              🚫 Bloquear horario/s
-            </button>
+            <Btn onClick={() => setShowBlockForm(true)} style={{ width: '100%', justifyContent: 'center' }}>
+              <Icon name="block" size={13} /> Bloquear horario/s
+            </Btn>
           )}
         </div>
       )}
@@ -251,44 +330,59 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="hidden lg:flex w-[280px] bg-white border-l border-gray-border flex-col shrink-0 h-full">
+    <div className="hidden lg:flex w-[340px] bg-surface border-l border-gray-border flex-col shrink-0 h-full">
       {children}
     </div>
   )
 }
 
-function PanelHeader({ children }: { children: React.ReactNode }) {
+function Eyebrow({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div className="px-[18px] pt-5 pb-4 border-b border-gray-border shrink-0">
-      <div className="text-[15px] font-semibold">{children}</div>
+    <div
+      className="text-[10px] text-text-hint uppercase tracking-[0.12em]"
+      style={{ fontFamily: 'var(--font-mono)', ...style }}
+    >
+      {children}
     </div>
   )
 }
 
-function Field({ label, value, isLink }: { label: string; value: string; isLink?: boolean }) {
+function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mb-3.5">
-      <div className="text-[11px] text-text-hint uppercase tracking-wide mb-1">{label}</div>
-      <div className={`text-[13px] ${isLink ? 'text-primary' : 'text-text'}`}>{value}</div>
+    <div className="px-3 py-2.5 bg-surface-2 border border-gray-border rounded-[10px]">
+      <Eyebrow>{label}</Eyebrow>
+      <div
+        className="text-[15px] mt-[3px] text-text tracking-[-0.01em]"
+        style={{ fontFamily: 'var(--font-serif)' }}
+      >
+        {value}
+      </div>
     </div>
   )
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-gray-bg rounded-lg px-3 py-2 text-center">
-      <div className="text-lg font-semibold text-text">{value}</div>
-      <div className="text-[10px] text-text-hint uppercase tracking-wide">{label}</div>
+    <div className="bg-surface-2 border border-gray-border rounded-[10px] px-3 py-2.5 text-center">
+      <div
+        className="text-[20px] leading-none tracking-[-0.015em] text-text"
+        style={{ fontFamily: 'var(--font-serif)' }}
+      >
+        {value}
+      </div>
+      <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        {label}
+      </div>
     </div>
   )
 }
 
 function StatusRow({ color, label, count }: { color: string; label: string; count: number }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="flex items-center gap-2.5 text-[12px]">
       <div className={`w-2 h-2 rounded-full shrink-0 ${color}`} />
       <span className="text-text-muted flex-1">{label}</span>
-      <span className="font-medium text-text">{count}</span>
+      <span className="text-text" style={{ fontFamily: 'var(--font-mono)' }}>{count}</span>
     </div>
   )
 }
@@ -314,60 +408,57 @@ function BlockHoursForm({ dayAppointments, blockFrom, blockTo, showConfirm, onCh
 
   if (showConfirm && validRange) {
     return (
-      <div className="bg-amber-light rounded-lg p-3">
+      <div className="bg-amber-light rounded-[10px] p-3.5">
         <div className="text-[11px] text-amber font-semibold mb-2">Confirmar bloqueo</div>
         <div className="text-xs text-amber mb-1">
           Bloquear de <strong>{blockFrom}</strong> a <strong>{blockTo}</strong>
         </div>
         {affectedNames.length > 0 ? (
           <>
-            <div className="text-xs text-coral font-medium mb-1.5">
-              ⚠️ {affectedNames.length} paciente{affectedNames.length !== 1 ? 's' : ''} afectado{affectedNames.length !== 1 ? 's' : ''}:
+            <div className="text-xs text-coral font-medium mb-1.5 mt-2">
+              {affectedNames.length} paciente{affectedNames.length !== 1 ? 's' : ''} afectado{affectedNames.length !== 1 ? 's' : ''}:
             </div>
             <div className="space-y-1 mb-2.5">
               {affectedAppts.map((a) => (
                 <div key={a.id} className="flex items-center gap-1.5 text-[11px]">
-                  <div className="w-4 h-4 rounded-full bg-coral-light flex items-center justify-center text-[8px] font-semibold text-coral shrink-0">
+                  <div
+                    className="w-4 h-4 rounded-full bg-coral-light text-coral grid place-items-center text-[8px] shrink-0"
+                    style={{ fontFamily: 'var(--font-serif)' }}
+                  >
                     {a.patientName!.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </div>
                   <span className="text-text">{a.patientName}</span>
-                  <span className="text-text-hint ml-auto">{a.time}</span>
+                  <span className="text-text-hint ml-auto" style={{ fontFamily: 'var(--font-mono)' }}>{a.time}</span>
                 </div>
               ))}
             </div>
-            <div className="text-[10px] text-coral/80 mb-2">
-              Se cancelarán estos turnos y se notificará a los pacientes por WhatsApp.
+            <div className="text-[10px] text-coral opacity-80 mb-2">
+              Se cancelarán estos turnos y se notificará a los pacientes.
             </div>
           </>
         ) : (
-          <div className="text-xs text-teal mb-2.5">
-            No hay pacientes afectados en este rango.
-          </div>
+          <div className="text-xs text-teal mb-2.5 mt-2">No hay pacientes afectados.</div>
         )}
         <div className="flex gap-2">
-          <button
-            onClick={() => {
-              onBlockHours()
-              onConfirm()
-            }}
-            className="flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs cursor-pointer border border-coral bg-coral text-white hover:bg-[#7a3017] transition-colors"
+          <Btn
+            size="sm"
+            variant="primary"
+            onClick={() => { onBlockHours(); onConfirm() }}
+            style={{ flex: 1, justifyContent: 'center' }}
           >
             {affectedNames.length > 0 ? 'Bloquear y notificar' : 'Bloquear'}
-          </button>
-          <button
-            onClick={onBack}
-            className="px-3 py-1.5 rounded-md text-xs cursor-pointer border border-gray-border bg-white text-text-muted hover:bg-gray-bg transition-colors"
-          >
-            Volver
-          </button>
+          </Btn>
+          <Btn size="sm" onClick={onBack}>Volver</Btn>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-gray-bg rounded-lg p-3">
-      <div className="text-[11px] text-text-hint uppercase tracking-wide mb-2">Bloquear horario/s</div>
+    <div className="bg-surface-2 border border-gray-border rounded-[10px] p-3.5">
+      <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-2" style={{ fontFamily: 'var(--font-mono)' }}>
+        Bloquear horario/s
+      </div>
       <div className="flex items-center gap-2 mb-2">
         <div className="flex-1">
           <label className="text-[10px] text-text-hint mb-0.5 block">Desde</label>
@@ -375,7 +466,7 @@ function BlockHoursForm({ dayAppointments, blockFrom, blockTo, showConfirm, onCh
             type="time"
             value={blockFrom}
             onChange={(e) => onChangeFrom(e.target.value)}
-            className="w-full px-2 py-1.5 rounded-md border border-gray-border text-xs bg-white focus:outline-none focus:border-primary-mid"
+            className="w-full px-2 py-1.5 rounded-[8px] border border-gray-border text-xs bg-surface focus:border-primary-mid"
           />
         </div>
         <div className="flex-1">
@@ -384,36 +475,24 @@ function BlockHoursForm({ dayAppointments, blockFrom, blockTo, showConfirm, onCh
             type="time"
             value={blockTo}
             onChange={(e) => onChangeTo(e.target.value)}
-            className="w-full px-2 py-1.5 rounded-md border border-gray-border text-xs bg-white focus:outline-none focus:border-primary-mid"
+            className="w-full px-2 py-1.5 rounded-[8px] border border-gray-border text-xs bg-surface focus:border-primary-mid"
           />
         </div>
       </div>
       {!validRange && (
         <div className="text-[10px] text-coral mb-2">La hora de fin debe ser posterior a la de inicio</div>
       )}
-      {validRange && affectedNames.length > 0 && (
-        <div className="text-[10px] text-amber mb-2">
-          ⚠️ {affectedNames.length} paciente{affectedNames.length !== 1 ? 's' : ''} en este rango
-        </div>
-      )}
       <div className="flex gap-2">
-        <button
-          onClick={onContinue}
+        <Btn
+          size="sm"
+          variant="primary"
           disabled={!validRange}
-          className={`flex-1 inline-flex items-center justify-center px-3 py-1.5 rounded-md text-xs cursor-pointer border transition-colors ${
-            !validRange
-              ? 'border-gray-border bg-gray-bg text-text-hint cursor-not-allowed'
-              : 'border-primary bg-primary text-white hover:bg-[#534AB7]'
-          }`}
+          onClick={onContinue}
+          style={{ flex: 1, justifyContent: 'center' }}
         >
           Continuar
-        </button>
-        <button
-          onClick={onCancel}
-          className="px-3 py-1.5 rounded-md text-xs cursor-pointer border border-gray-border bg-white text-text-muted hover:bg-gray-bg transition-colors"
-        >
-          Cancelar
-        </button>
+        </Btn>
+        <Btn size="sm" onClick={onCancel}>Cancelar</Btn>
       </div>
     </div>
   )

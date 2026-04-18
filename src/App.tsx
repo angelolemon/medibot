@@ -25,6 +25,9 @@ import JoinOrgView from './components/org/JoinOrgView'
 import CreateOrgModal from './components/org/CreateOrgModal'
 import OnboardingWizard from './components/onboarding/OnboardingWizard'
 import PublicBookingPage from './components/public/PublicBookingPage'
+import Icon from './components/Icon'
+import Btn from './components/Btn'
+import PageHeader from './components/PageHeader'
 
 type AuthScreen = 'loading' | 'login' | 'register' | 'onboarding' | 'join-org' | 'app' | 'public-booking'
 type AgendaMode = 'week' | 'month'
@@ -414,112 +417,30 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
       {activeView === 'agenda' && (
         <>
-          <div className="flex-1 flex flex-col h-screen overflow-hidden bg-gray-bg">
-            <div className="p-6 sm:p-8 overflow-y-auto flex-1 pb-20 lg:pb-8">
-              {/* Header: siempre visible */}
-              <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
-                <div>
-                  <h1 className="text-[36px] sm:text-[44px] font-bold text-text leading-[1.05] tracking-tight">
-                    Agenda
-                  </h1>
-                  <p className="text-[14px] text-text-muted mt-2 capitalize">
-                    {heroSubtitle} · planificá y gestioná tus turnos.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex rounded-full border border-gray-border overflow-hidden bg-white p-1">
-                    <button
-                      onClick={() => setAgendaMode('week')}
-                      className={`px-4 py-[7px] text-[12px] cursor-pointer rounded-full transition-colors ${
-                        agendaMode === 'week'
-                          ? 'bg-primary text-white'
-                          : 'bg-white text-text-muted hover:bg-gray-bg'
-                      }`}
-                    >
-                      Semana
-                    </button>
-                    <button
+          <div className="flex-1 flex flex-col h-screen overflow-hidden bg-bg">
+            <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10">
+              <PageHeader
+                title="Agenda."
+                subtitle={<span className="capitalize">{heroSubtitle} · {filteredAppointments.length} {filteredAppointments.length === 1 ? 'turno programado' : 'turnos programados'}</span>}
+                right={
+                  <>
+                    <Btn
+                      variant={agendaMode === 'month' ? 'primary' : 'secondary'}
                       onClick={handleToggleAgendaMode}
-                      className={`px-4 py-[7px] text-[12px] cursor-pointer rounded-full transition-colors ${
-                        agendaMode === 'month'
-                          ? 'bg-primary text-white'
-                          : 'bg-white text-text-muted hover:bg-gray-bg'
-                      }`}
                     >
-                      Mes
-                    </button>
-                  </div>
-                  <button className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-[13px] font-medium cursor-pointer bg-primary text-white hover:bg-[#534AB7] transition-colors">
-                    <span className="text-base leading-none">+</span> Turno manual
-                  </button>
-                </div>
-              </div>
+                      <Icon name="cal2" size={13} /> {agendaMode === 'week' ? 'Mes' : 'Semana'}
+                    </Btn>
+                    <Btn variant="primary">
+                      <Icon name="plus" size={13} /> Nuevo turno
+                    </Btn>
+                  </>
+                }
+              />
 
               {agendaMode === 'week' ? (
                 <>
-                  {/* 4 stat cards (hero card primero destacado) */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-gradient-to-br from-primary to-[#2A2470] text-white rounded-[16px] p-4 relative overflow-hidden">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-[12px] font-medium opacity-90">Total turnos</div>
-                        <div className="w-6 h-6 rounded-full border border-white/30 flex items-center justify-center text-[10px]">↗</div>
-                      </div>
-                      <div className="text-[30px] font-bold leading-none mb-1.5">{filteredAppointments.length}</div>
-                      <div className="text-[10px] opacity-80">
-                        <span className="inline-flex items-center gap-1 bg-white/15 rounded-md px-1.5 py-0.5 mr-1.5">
-                          {isToday ? 'Hoy' : dayLabel}
-                        </span>
-                        {filteredAppointments.length === 0 ? 'Sin turnos' : 'Agendados'}
-                      </div>
-                    </div>
-
-                    <div className="bg-white border border-gray-border rounded-[16px] p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-[12px] font-medium text-text">Confirmados</div>
-                        <div className="w-6 h-6 rounded-full border border-gray-border flex items-center justify-center text-[10px] text-text-muted">↗</div>
-                      </div>
-                      <div className="text-[30px] font-bold leading-none mb-1.5 text-text">{confirmadosCount}</div>
-                      <div className="text-[10px] text-teal flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-teal" />
-                        {filteredAppointments.length > 0
-                          ? `${Math.round((confirmadosCount / filteredAppointments.length) * 100)}% del día`
-                          : 'Sin datos'}
-                      </div>
-                    </div>
-
-                    <div className="bg-white border border-gray-border rounded-[16px] p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-[12px] font-medium text-text">Pendientes</div>
-                        <div className="w-6 h-6 rounded-full border border-gray-border flex items-center justify-center text-[10px] text-text-muted">↗</div>
-                      </div>
-                      <div className="text-[30px] font-bold leading-none mb-1.5 text-text">{pendientesCount}</div>
-                      <div className="text-[10px] text-[#EF9F27] flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#EF9F27]" />
-                        Esperando confirmación
-                      </div>
-                    </div>
-
-                    <div className="bg-white border border-gray-border rounded-[16px] p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-[12px] font-medium text-text">Cancelados</div>
-                        <div className="w-6 h-6 rounded-full border border-gray-border flex items-center justify-center text-[10px] text-text-muted">↗</div>
-                      </div>
-                      <div className="text-[30px] font-bold leading-none mb-1.5 text-text">{canceladosCount}</div>
-                      <div className="text-[10px] text-text-muted flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-coral" />
-                        {canceladosCount === 0 ? 'Sin cancelaciones' : 'En el día'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Week strip + Turnos, grouped en card grande */}
-                  <div className="bg-white border border-gray-border rounded-[20px] p-5 sm:p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <div className="text-[16px] font-semibold text-text">Semana</div>
-                        <div className="text-[12px] text-text-muted mt-0.5">Seleccioná un día para ver sus turnos</div>
-                      </div>
-                    </div>
+                  {/* Week nav */}
+                  <div className="mb-5">
                     <DayNav
                       days={weekDays}
                       selectedDate={selectedDate}
@@ -527,41 +448,66 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       onSelect={handleDaySelect}
                       onPrevWeek={handlePrevWeek}
                       onNextWeek={handleNextWeek}
+                      appointmentCounts={weekDays.reduce((acc, d) => {
+                        acc[d.date] = appointments.filter((a) => a.date === d.date).length
+                        return acc
+                      }, {} as Record<string, number>)}
                     />
-
-                    {isSelectedDateBlocked && (
-                      <div className="flex items-center gap-2 bg-coral-light border border-coral/20 rounded-[14px] px-4 py-2.5 mt-4 mb-2">
-                        <span className="text-sm">🏖️</span>
-                        <span className="text-xs text-coral font-medium flex-1">
-                          Día bloqueado — {blockForSelectedDate?.reason ?? 'Bloqueado'}
-                        </span>
-                        <button
-                          onClick={handleUnblockDate}
-                          className="text-[11px] px-3 py-1 rounded-full border border-coral/30 bg-white text-coral cursor-pointer hover:bg-coral-light transition-colors"
-                        >
-                          Desbloquear
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="border-t border-gray-border pt-5 mt-4">
-                      <AppointmentList
-                        appointments={filteredAppointments}
-                        selectedId={selectedId}
-                        onSelect={handleSelect}
-                        onCancel={handleCancel}
-                        onSendIndicaciones={handleSendIndicaciones}
-                        onRecordar={handleRecordar}
-                        dayLabel={dayLabel}
-                      />
-
-                      {isSelectedDateBlocked && filteredAppointments.length === 0 && (
-                        <div className="text-center py-8">
-                          <div className="text-sm text-text-hint">Sin turnos asignados</div>
-                        </div>
-                      )}
-                    </div>
                   </div>
+
+                  {/* Stat strip — 4 cols inside single card with dividers */}
+                  <div className="bg-surface border border-gray-border rounded-[12px] overflow-hidden mb-5 grid grid-cols-4 divide-x divide-gray-border">
+                    {[
+                      { label: 'Total', value: filteredAppointments.length, dot: 'hint' as const },
+                      { label: 'Confirmados', value: confirmadosCount, dot: 'teal' as const },
+                      { label: 'Pendientes', value: pendientesCount, dot: 'amber' as const },
+                      { label: 'Cancelados', value: canceladosCount, dot: 'coral' as const },
+                    ].map((s) => (
+                      <div key={s.label} className="px-5 py-4">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            s.dot === 'teal' ? 'bg-teal'
+                              : s.dot === 'amber' ? 'bg-amber'
+                                : s.dot === 'coral' ? 'bg-coral'
+                                  : 'bg-text-dim'
+                          }`} />
+                          <span className="text-[10px] text-text-hint uppercase tracking-[0.12em]" style={{ fontFamily: 'var(--font-mono)' }}>
+                            {s.label}
+                          </span>
+                        </div>
+                        <div className="text-[26px] leading-none tracking-[-0.02em] text-text" style={{ fontFamily: 'var(--font-serif)' }}>
+                          {s.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {isSelectedDateBlocked && (
+                    <div className="flex items-center gap-2 bg-coral-light border border-gray-border rounded-[12px] px-4 py-3 mb-5">
+                      <Icon name="block" size={14} style={{ color: 'var(--color-coral)' }} />
+                      <span className="text-[12px] text-coral font-medium flex-1">
+                        Día bloqueado — {blockForSelectedDate?.reason ?? 'Bloqueado'}
+                      </span>
+                      <Btn size="sm" variant="danger" onClick={handleUnblockDate}>Desbloquear</Btn>
+                    </div>
+                  )}
+
+                  {/* Appointment list */}
+                  <AppointmentList
+                    appointments={filteredAppointments}
+                    selectedId={selectedId}
+                    onSelect={handleSelect}
+                    onCancel={handleCancel}
+                    onSendIndicaciones={handleSendIndicaciones}
+                    onRecordar={handleRecordar}
+                    dayLabel={dayLabel}
+                  />
+
+                  {isSelectedDateBlocked && filteredAppointments.length === 0 && (
+                    <div className="text-center py-10">
+                      <div className="text-sm text-text-hint">Sin turnos asignados</div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <MonthCalendar

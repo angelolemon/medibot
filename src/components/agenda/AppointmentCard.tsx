@@ -1,27 +1,29 @@
 import type { Appointment } from '../../data/appointments'
+import Icon from '../Icon'
+import Btn from '../Btn'
 
 const statusLineColor: Record<string, string> = {
   confirmado: 'bg-teal',
-  pendiente: 'bg-[#EF9F27]',
-  cancelado: 'bg-[#E24B4A]',
-  libre: 'bg-[#D3D1C7]',
-  bloqueado: 'bg-[#999]',
+  pendiente: 'bg-amber',
+  cancelado: 'bg-coral',
+  libre: 'bg-gray-border-2',
+  bloqueado: 'bg-text-dim',
 }
 
 const badgeStyles: Record<string, string> = {
   confirmado: 'bg-teal-light text-teal',
   pendiente: 'bg-amber-light text-amber',
   cancelado: 'bg-coral-light text-coral',
-  libre: 'bg-gray-bg text-text-hint',
-  bloqueado: 'bg-gray-bg text-text-hint',
+  libre: 'bg-surface-2 text-text-hint',
+  bloqueado: 'bg-surface-2 text-text-hint',
 }
 
 const badgeLabel: Record<string, string> = {
   confirmado: 'Confirmado',
   pendiente: 'Sin confirmar',
   cancelado: 'Cancelado',
-  libre: 'Disponible para pacientes',
-  bloqueado: 'Horario bloqueado',
+  libre: 'Disponible',
+  bloqueado: 'Bloqueado',
 }
 
 interface Props {
@@ -48,42 +50,45 @@ export default function AppointmentCard({
   return (
     <div
       onClick={() => onSelect(appointment)}
-      className={`group bg-white border rounded-[10px] px-4 py-3.5 mb-2 flex flex-wrap sm:flex-nowrap items-center gap-3.5 cursor-pointer transition-shadow ${
+      className={`group border rounded-[12px] px-[18px] py-[14px] mb-2 flex flex-wrap sm:flex-nowrap items-center gap-4 cursor-pointer transition-colors ${
         isSelected
-          ? 'border-primary-mid bg-[#FAFAFE]'
+          ? 'border-primary-mid bg-primary-light'
           : isBloqueado
-            ? 'border-gray-border bg-gray-bg/50'
-            : 'border-gray-border hover:shadow-[0_2px_8px_rgba(0,0,0,0.07)]'
+            ? 'border-gray-border bg-surface-2'
+            : 'border-gray-border bg-surface hover:border-gray-border-2'
       }`}
     >
       {/* Time */}
-      <div className="min-w-[52px] text-center">
-        <div className={`text-sm font-semibold ${isInactive ? 'text-[#bbb]' : 'text-primary'}`}>
+      <div className="min-w-[56px] text-center">
+        <div
+          className={`text-[18px] tracking-[-0.015em] leading-none ${isInactive ? 'text-text-dim' : 'text-primary'}`}
+          style={{ fontFamily: 'var(--font-serif)' }}
+        >
           {appointment.time}
         </div>
-        <div className="text-[11px] text-text-hint">{appointment.duration}</div>
+        <div className="text-[10px] text-text-hint mt-1" style={{ fontFamily: 'var(--font-mono)' }}>
+          {appointment.duration}
+        </div>
       </div>
 
       {/* Status line */}
-      <div className={`w-0.5 h-9 rounded-sm shrink-0 hidden sm:block ${statusLineColor[appointment.status]}`} />
+      <div className={`w-[2px] h-9 rounded-[1px] shrink-0 hidden sm:block ${statusLineColor[appointment.status]}`} />
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <div className={`text-sm font-medium ${isInactive ? 'text-text-hint font-normal' : ''}`}>
+        <div className={`text-[14px] font-medium ${isInactive ? 'text-text-hint font-normal' : 'text-text'}`}>
           {isBloqueado
-            ? appointment.patientName
-              ? <>🚫 {appointment.patientName}</>
-              : <>🚫 Horario bloqueado</>
+            ? 'Horario bloqueado'
             : isLibre ? 'Horario libre' : appointment.patientName}
         </div>
-        <div className="text-xs text-text-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
+        <div className="text-[12px] text-text-muted mt-[3px] flex items-center gap-2.5 flex-wrap">
           {appointment.doctorLabel && (
-            <span className="inline-block text-[11px] font-medium px-2 py-px rounded-full bg-primary-light text-primary">
+            <span className="inline-block text-[11px] font-medium px-2 py-[2px] rounded-full bg-primary-light text-primary">
               {appointment.doctorLabel}
             </span>
           )}
-          {!isLibre && <span>{appointment.detail}</span>}
-          <span className={`inline-block text-[11px] font-medium px-2 py-px rounded-full ${badgeStyles[appointment.status]}`}>
+          {!isLibre && !isBloqueado && appointment.detail && <span>{appointment.detail}</span>}
+          <span className={`inline-block text-[11px] font-medium px-[9px] py-[2px] rounded-full ${badgeStyles[appointment.status]}`}>
             {badgeLabel[appointment.status]}
           </span>
         </div>
@@ -93,51 +98,27 @@ export default function AppointmentCard({
       <div className={`flex gap-1.5 shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} max-lg:opacity-100`}>
         {appointment.status === 'confirmado' && (
           <>
-            <button
-              onClick={(e) => { e.stopPropagation(); onSendIndicaciones(appointment) }}
-              className="text-[11px] px-2 py-1 rounded-md border border-primary-mid bg-primary-light text-primary cursor-pointer whitespace-nowrap"
-            >
-              📤 Indicaciones
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onCancel(appointment.id) }}
-              className="text-[11px] px-2 py-1 rounded-md border border-gray-border bg-white text-text-muted cursor-pointer hover:bg-gray-bg"
-            >
-              Cancelar
-            </button>
+            <Btn size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); onSendIndicaciones(appointment) }}>
+              <Icon name="send" size={12} /> Indicaciones
+            </Btn>
+            <Btn size="sm" onClick={(e) => { e.stopPropagation(); onCancel(appointment.id) }}>Cancelar</Btn>
           </>
         )}
         {appointment.status === 'pendiente' && (
           <>
-            <button
-              onClick={(e) => { e.stopPropagation(); onRecordar(appointment) }}
-              className="text-[11px] px-2 py-1 rounded-md border border-primary-mid bg-primary-light text-primary cursor-pointer whitespace-nowrap"
-            >
-              📲 Recordar
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onCancel(appointment.id) }}
-              className="text-[11px] px-2 py-1 rounded-md border border-gray-border bg-white text-text-muted cursor-pointer hover:bg-gray-bg"
-            >
-              Cancelar
-            </button>
+            <Btn size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); onRecordar(appointment) }}>
+              <Icon name="chat" size={12} /> Recordar
+            </Btn>
+            <Btn size="sm" onClick={(e) => { e.stopPropagation(); onCancel(appointment.id) }}>Cancelar</Btn>
           </>
         )}
         {appointment.status === 'cancelado' && (
-          <button
-            onClick={(e) => e.stopPropagation()}
-            className="text-[11px] px-2 py-1 rounded-md border border-gray-border bg-white text-text-muted cursor-pointer hover:bg-gray-bg"
-          >
-            + Reasignar
-          </button>
+          <Btn size="sm" onClick={(e) => e.stopPropagation()}>
+            <Icon name="plus" size={12} /> Reasignar
+          </Btn>
         )}
         {appointment.status === 'libre' && (
-          <button
-            onClick={(e) => e.stopPropagation()}
-            className="text-[11px] px-2 py-1 rounded-md border border-gray-border bg-white text-text-muted cursor-pointer hover:bg-gray-bg"
-          >
-            Bloquear
-          </button>
+          <Btn size="sm" onClick={(e) => e.stopPropagation()}>Bloquear</Btn>
         )}
       </div>
     </div>

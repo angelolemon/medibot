@@ -1,4 +1,7 @@
 import type { Appointment, Patient } from '../../data/appointments'
+import PageHeader from '../PageHeader'
+import Icon from '../Icon'
+import Btn from '../Btn'
 
 interface Props {
   appointments: Appointment[]
@@ -81,15 +84,13 @@ export default function StatsView({ appointments, patients }: Props) {
   const tagsSorted = Object.entries(tagCounts).sort((a, b) => b[1] - a[1])
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-bg">
-      <div className="p-6 sm:p-8 overflow-y-auto flex-1 pb-20 lg:pb-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
-          <div>
-            <h1 className="text-[36px] sm:text-[44px] font-bold text-text leading-[1.05] tracking-tight">Estadísticas</h1>
-            <p className="text-[14px] text-text-muted mt-2">Resumen de tu práctica profesional.</p>
-          </div>
-        </div>
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg">
+      <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10">
+        <PageHeader
+          title="Estadísticas."
+          subtitle="Resumen de tu práctica profesional."
+          right={<Btn><Icon name="cal2" size={13} /> Abril 2026</Btn>}
+        />
         {/* Top KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <KpiCard
@@ -123,7 +124,7 @@ export default function StatsView({ appointments, patients }: Props) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           {/* This week summary */}
           <div className="bg-white border border-gray-border rounded-[16px] p-5">
-            <div className="text-[13px] font-semibold mb-4">Esta semana</div>
+            <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-4" style={{ fontFamily: "var(--font-mono)" }}>Esta semana</div>
             <div className="grid grid-cols-3 gap-3 mb-4">
               <MiniStat label="Turnos" value={thisWeekTotal} />
               <MiniStat label="Confirmados" value={thisWeekConfirmed} color="text-teal" />
@@ -139,7 +140,7 @@ export default function StatsView({ appointments, patients }: Props) {
 
           {/* Next week preview */}
           <div className="bg-white border border-gray-border rounded-[16px] p-5">
-            <div className="text-[13px] font-semibold mb-4">Próxima semana</div>
+            <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-4" style={{ fontFamily: "var(--font-mono)" }}>Próxima semana</div>
             <div className="grid grid-cols-3 gap-3 mb-4">
               <MiniStat label="Turnos" value={nextWeekTotal} />
               <MiniStat label="Pendientes" value={nextWeekAppts.filter(a => a.status === 'pendiente').length} color="text-amber" />
@@ -156,7 +157,7 @@ export default function StatsView({ appointments, patients }: Props) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           {/* Appointments by day */}
           <div className="bg-white border border-gray-border rounded-[16px] p-5">
-            <div className="text-[13px] font-semibold mb-4">Turnos por día de la semana</div>
+            <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-4" style={{ fontFamily: "var(--font-mono)" }}>Turnos por día de la semana</div>
             <div className="space-y-2">
               {dayNames.map((name, i) => (
                 <div key={name} className="flex items-center gap-3">
@@ -175,7 +176,7 @@ export default function StatsView({ appointments, patients }: Props) {
 
           {/* Insurance breakdown */}
           <div className="bg-white border border-gray-border rounded-[16px] p-5">
-            <div className="text-[13px] font-semibold mb-4">Obras sociales</div>
+            <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-4" style={{ fontFamily: "var(--font-mono)" }}>Obras sociales</div>
             <div className="space-y-2.5">
               {insuranceSorted.map(([name, count]) => (
                 <div key={name} className="flex items-center justify-between">
@@ -208,7 +209,7 @@ export default function StatsView({ appointments, patients }: Props) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Top patients */}
           <div className="bg-white border border-gray-border rounded-[16px] p-5">
-            <div className="text-[13px] font-semibold mb-4">Pacientes con más sesiones</div>
+            <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-4" style={{ fontFamily: "var(--font-mono)" }}>Pacientes con más sesiones</div>
             <div className="space-y-2">
               {topPatients.map((p, i) => (
                 <div key={p.name} className="flex items-center gap-3 py-1.5">
@@ -227,7 +228,7 @@ export default function StatsView({ appointments, patients }: Props) {
 
           {/* Pathology tags */}
           <div className="bg-white border border-gray-border rounded-[16px] p-5">
-            <div className="text-[13px] font-semibold mb-4">Motivos de consulta</div>
+            <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-4" style={{ fontFamily: "var(--font-mono)" }}>Motivos de consulta</div>
             <div className="flex flex-wrap gap-2">
               {tagsSorted.map(([tag, count]) => (
                 <div key={tag} className="flex items-center gap-1.5 bg-primary-light rounded-full px-3 py-1.5">
@@ -250,15 +251,22 @@ export default function StatsView({ appointments, patients }: Props) {
   )
 }
 
-function KpiCard({ label, value, icon, accent, sub }: { label: string; value: string; icon: string; accent?: 'coral' | 'teal'; sub?: string }) {
+function KpiCard({ label, value, accent, sub }: { label: string; value: string; icon?: string; accent?: 'coral' | 'teal'; sub?: string }) {
   return (
-    <div className="bg-white border border-gray-border rounded-[16px] px-4 py-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-lg">{icon}</span>
+    <div className="bg-surface border border-gray-border rounded-[14px] px-5 py-4">
+      <div
+        className="text-[10px] text-text-hint uppercase tracking-[0.12em]"
+        style={{ fontFamily: 'var(--font-mono)' }}
+      >
+        {label}
       </div>
-      <div className={`text-2xl font-semibold ${accent === 'coral' ? 'text-coral' : accent === 'teal' ? 'text-teal' : 'text-text'}`}>{value}</div>
-      <div className="text-[11px] text-text-hint uppercase tracking-wide mt-1">{label}</div>
-      {sub && <div className="text-[11px] text-text-muted mt-1.5">{sub}</div>}
+      <div
+        className={`text-[30px] leading-none tracking-[-0.025em] mt-2 ${accent === 'coral' ? 'text-coral' : accent === 'teal' ? 'text-teal' : 'text-text'}`}
+        style={{ fontFamily: 'var(--font-serif)' }}
+      >
+        {value}
+      </div>
+      {sub && <div className="text-[11px] text-text-muted mt-2">{sub}</div>}
     </div>
   )
 }
@@ -266,8 +274,15 @@ function KpiCard({ label, value, icon, accent, sub }: { label: string; value: st
 function MiniStat({ label, value, color }: { label: string; value: number; color?: string }) {
   return (
     <div className="text-center">
-      <div className={`text-xl font-semibold ${color ?? 'text-text'}`}>{value}</div>
-      <div className="text-[10px] text-text-hint uppercase tracking-wide">{label}</div>
+      <div
+        className={`text-[22px] leading-none tracking-[-0.015em] ${color ?? 'text-text'}`}
+        style={{ fontFamily: 'var(--font-serif)' }}
+      >
+        {value}
+      </div>
+      <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mt-1.5" style={{ fontFamily: 'var(--font-mono)' }}>
+        {label}
+      </div>
     </div>
   )
 }

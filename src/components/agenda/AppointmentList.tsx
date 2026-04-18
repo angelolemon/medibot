@@ -22,11 +22,14 @@ export default function AppointmentList({
 }: Props) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-[13px] font-semibold text-text">
-          Turnos · <span className="text-text-muted font-medium">{dayLabel}</span>
+      <div className="flex items-baseline justify-between mb-3">
+        <div
+          className="text-[10px] text-text-hint uppercase tracking-[0.12em]"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          Turnos · {dayLabel}
         </div>
-        <div className="text-[11px] text-text-hint">
+        <div className="text-[10px] text-text-hint" style={{ fontFamily: 'var(--font-mono)' }}>
           {appointments.length} {appointments.length === 1 ? 'turno' : 'turnos'}
         </div>
       </div>

@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import type { DateBlock } from '../../data/appointments'
 import { formatDateShort, getDatesBetween } from '../../data/appointments'
+import PageHeader from '../PageHeader'
+import Icon from '../Icon'
+import Btn from '../Btn'
 
 interface Props {
   blocks: DateBlock[]
@@ -32,47 +35,46 @@ export default function BlocksView({ blocks, onAdd, onRemove }: Props) {
   const pastBlocks = blocks.filter((b) => b.to < new Date().toISOString().split('T')[0])
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-bg">
-      <div className="p-6 sm:p-8 overflow-y-auto flex-1 pb-20 lg:pb-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
-          <div>
-            <h1 className="text-[36px] sm:text-[44px] font-bold text-text leading-[1.05] tracking-tight">Bloqueos</h1>
-            <p className="text-[14px] text-text-muted mt-2">Bloqueá rangos de fechas para no recibir turnos.</p>
-          </div>
-        </div>
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg">
+      <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10">
+        <PageHeader
+          title="Bloqueos."
+          subtitle="Fechas y horarios no disponibles para nuevos turnos."
+        />
         {/* New block form */}
-        <form onSubmit={handleSubmit} className="bg-white border border-gray-border rounded-[16px] p-5 mb-6">
-          <div className="text-[13px] font-semibold mb-4">Nuevo bloqueo</div>
+        <form onSubmit={handleSubmit} className="bg-surface border border-gray-border rounded-[14px] p-5 mb-6">
+          <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-4" style={{ fontFamily: 'var(--font-mono)' }}>
+            Nuevo bloqueo
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
             <div>
-              <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Desde</label>
+              <label className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-1 block" style={{ fontFamily: 'var(--font-mono)' }}>Desde</label>
               <input
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid"
+                className="w-full px-3 py-[9px] rounded-[8px] border border-gray-border bg-surface-2 text-[13px] text-text focus:border-primary-mid"
                 required
               />
             </div>
             <div>
-              <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Hasta</label>
+              <label className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-1 block" style={{ fontFamily: 'var(--font-mono)' }}>Hasta</label>
               <input
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
                 min={from}
-                className="w-full px-3 py-2 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid"
+                className="w-full px-3 py-[9px] rounded-[8px] border border-gray-border bg-surface-2 text-[13px] text-text focus:border-primary-mid"
                 required
               />
             </div>
             <div>
-              <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Motivo</label>
+              <label className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-1 block" style={{ fontFamily: 'var(--font-mono)' }}>Motivo</label>
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-gray-border text-sm bg-white focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid"
+                className="w-full px-3 py-[9px] rounded-[8px] border border-gray-border bg-surface-2 text-[13px] text-text focus:border-primary-mid"
               >
                 <option>Vacaciones</option>
                 <option>Congreso / Capacitación</option>
@@ -90,41 +92,33 @@ export default function BlocksView({ blocks, onAdd, onRemove }: Props) {
           )}
 
           {overlappingBlock && (
-            <div className="flex items-center gap-2 bg-coral-light border border-coral/20 rounded-md px-3 py-2 mb-3">
-              <span className="text-sm">⚠️</span>
+            <div className="flex items-center gap-2 bg-coral-light rounded-[8px] px-3 py-2 mb-3">
+              <Icon name="block" size={14} style={{ color: 'var(--color-coral)' }} />
               <div className="text-xs text-coral">
                 Las fechas se superponen con <strong>{overlappingBlock.reason}</strong> ({formatDateShort(overlappingBlock.from)} → {formatDateShort(overlappingBlock.to)}). Elegí un rango que no se pise con bloqueos existentes.
               </div>
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={!!overlappingBlock}
-            className={`inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-[13px] font-medium cursor-pointer transition-colors ${
-              overlappingBlock
-                ? 'bg-gray-bg text-text-hint cursor-not-allowed'
-                : 'bg-primary text-white hover:bg-[#534AB7]'
-            }`}
-          >
-            🏖️ Crear bloqueo
-          </button>
+          <Btn type="submit" disabled={!!overlappingBlock} variant="primary">
+            <Icon name="plus" size={13} /> Crear bloqueo
+          </Btn>
         </form>
 
         {/* Active blocks */}
-        <div className="mb-6">
-          <div className="text-[13px] font-semibold text-text-muted uppercase tracking-wide mb-3">
+        <div className="mb-8">
+          <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
             Bloqueos activos · {activeBlocks.length}
           </div>
 
           {activeBlocks.length === 0 ? (
-            <div className="bg-white border border-gray-border rounded-[16px] p-6 text-center">
-              <div className="text-2xl mb-2">✅</div>
-              <div className="text-sm text-text-muted">No hay bloqueos activos</div>
+            <div className="bg-surface border border-gray-border rounded-[14px] p-6 text-center">
+              <Icon name="check" size={20} style={{ color: 'var(--color-teal)' }} />
+              <div className="text-sm text-text-muted mt-2">No hay bloqueos activos</div>
               <div className="text-xs text-text-hint mt-1">Todos los días están disponibles para turnos</div>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               {activeBlocks.map((block) => (
                 <BlockCard key={block.id} block={block} onRemove={onRemove} />
               ))}
@@ -132,13 +126,12 @@ export default function BlocksView({ blocks, onAdd, onRemove }: Props) {
           )}
         </div>
 
-        {/* Past blocks */}
         {pastBlocks.length > 0 && (
           <div>
-            <div className="text-[13px] font-semibold text-text-muted uppercase tracking-wide mb-3">
+            <div className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-3" style={{ fontFamily: 'var(--font-mono)' }}>
               Bloqueos pasados · {pastBlocks.length}
             </div>
-            <div className="space-y-2 opacity-60">
+            <div className="flex flex-col gap-2 opacity-60">
               {pastBlocks.map((block) => (
                 <BlockCard key={block.id} block={block} onRemove={onRemove} isPast />
               ))}
@@ -153,32 +146,40 @@ export default function BlocksView({ blocks, onAdd, onRemove }: Props) {
 function BlockCard({ block, onRemove, isPast }: { block: DateBlock; onRemove: (id: string) => void; isPast?: boolean }) {
   const days = getDatesBetween(block.from, block.to).length
 
-  const reasonIcons: Record<string, string> = {
-    'Vacaciones': '🏖️',
-    'Congreso / Capacitación': '📚',
-    'Licencia médica': '🏥',
-    'Feriado': '🎉',
-    'Otro': '📌',
+  const reasonStyle: Record<string, { bg: string; fg: string }> = {
+    'Vacaciones': { bg: 'bg-teal-light', fg: 'text-teal' },
+    'Congreso / Capacitación': { bg: 'bg-primary-light', fg: 'text-primary' },
+    'Licencia médica': { bg: 'bg-coral-light', fg: 'text-coral' },
+    'Feriado': { bg: 'bg-amber-light', fg: 'text-amber' },
+    'Otro': { bg: 'bg-surface-2', fg: 'text-text-muted' },
   }
+  const s = reasonStyle[block.reason] ?? reasonStyle['Otro']
 
   return (
-    <div className="bg-white border border-gray-border rounded-[16px] px-4 py-3.5 flex items-center gap-3.5">
-      <div className="w-10 h-10 rounded-[16px] bg-coral-light flex items-center justify-center text-lg shrink-0">
-        {reasonIcons[block.reason] ?? '📌'}
+    <div className="bg-surface border border-gray-border rounded-[14px] px-5 py-4 flex items-center gap-4">
+      <div className="min-w-[92px]">
+        <div className="text-[18px] tracking-[-0.015em] leading-none text-text" style={{ fontFamily: 'var(--font-serif)' }}>
+          {formatDateShort(block.from)}
+        </div>
+        {block.from !== block.to && (
+          <div className="text-[11px] text-text-hint mt-[3px]" style={{ fontFamily: 'var(--font-mono)' }}>
+            → {formatDateShort(block.to)}
+          </div>
+        )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium">{block.reason}</div>
-        <div className="text-xs text-text-muted mt-0.5">
-          {formatDateShort(block.from)} → {formatDateShort(block.to)} · {days} día{days !== 1 ? 's' : ''}
+        <div className="text-[14px] font-medium text-text">{block.reason}</div>
+        <div className="text-[12px] text-text-muted mt-[3px] flex items-center gap-2">
+          <span className={`inline-block text-[11px] font-medium px-[9px] py-[2px] rounded-full ${s.bg} ${s.fg}`}>
+            {block.reason}
+          </span>
+          <span>{days} día{days !== 1 ? 's' : ''}</span>
         </div>
       </div>
       {!isPast && (
-        <button
-          onClick={() => onRemove(block.id)}
-          className="text-[11px] px-2 py-1 rounded-md border border-gray-border bg-white text-text-muted cursor-pointer hover:bg-gray-bg shrink-0"
-        >
+        <Btn size="sm" variant="danger" onClick={() => onRemove(block.id)}>
           Eliminar
-        </button>
+        </Btn>
       )}
     </div>
   )

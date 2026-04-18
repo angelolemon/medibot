@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useProfile, type ProfileRow } from '../../lib/hooks'
 import { supabase } from '../../lib/supabase'
 import { getPlan, type PlanId } from '../../lib/plans'
+import PageHeader from '../PageHeader'
+import Btn from '../Btn'
 
 interface DoctorData {
   firstName: string
@@ -126,54 +128,30 @@ export default function DoctorProfileView({ onLogout, onOpenPlans }: Props) {
   const initials = `${(data.firstName || 'M')[0]}${(data.lastName || 'B')[0]}`
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-bg">
-      <div className="p-6 sm:p-8 overflow-y-auto flex-1 pb-20 lg:pb-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-8">
-          <div>
-            <h1 className="text-[36px] sm:text-[44px] font-bold text-text leading-[1.05] tracking-tight">Mi perfil</h1>
-            <p className="text-[14px] text-text-muted mt-2">Datos profesionales y configuración de consultorio.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {saved && (
-              <span className="text-xs text-teal font-medium">Guardado</span>
-            )}
-            {editing ? (
-              <>
-                <button
-                  onClick={handleCancelEdit}
-                  className="px-5 py-2.5 rounded-full text-[13px] font-medium cursor-pointer bg-white text-text border border-gray-border hover:bg-gray-bg transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="px-5 py-2.5 rounded-full text-[13px] font-medium cursor-pointer bg-primary text-white hover:bg-[#534AB7] transition-colors disabled:opacity-60"
-                >
-                  {saving ? 'Guardando...' : 'Guardar cambios'}
-                </button>
-              </>
-            ) : (
-              <>
-                {onLogout && (
-                  <button
-                    onClick={onLogout}
-                    className="px-5 py-2.5 rounded-full text-[13px] font-medium cursor-pointer bg-white text-text border border-gray-border hover:bg-gray-bg transition-colors"
-                  >
-                    Cerrar sesión
-                  </button>
-                )}
-                <button
-                  onClick={() => setEditing(true)}
-                  className="px-5 py-2.5 rounded-full text-[13px] font-medium cursor-pointer bg-primary text-white hover:bg-[#534AB7] transition-colors"
-                >
-                  Editar perfil
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg">
+      <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10">
+        <PageHeader
+          title="Mi perfil."
+          subtitle="Datos profesionales y configuración de consultorio."
+          right={
+            <>
+              {saved && <span className="text-xs text-teal font-medium mr-1">Guardado</span>}
+              {editing ? (
+                <>
+                  <Btn onClick={handleCancelEdit}>Cancelar</Btn>
+                  <Btn variant="primary" onClick={handleSave} disabled={saving}>
+                    {saving ? 'Guardando…' : 'Guardar cambios'}
+                  </Btn>
+                </>
+              ) : (
+                <>
+                  {onLogout && <Btn onClick={onLogout}>Cerrar sesión</Btn>}
+                  <Btn variant="primary" onClick={() => setEditing(true)}>Editar perfil</Btn>
+                </>
+              )}
+            </>
+          }
+        />
         {/* Avatar + Name header */}
         <div className="flex items-center gap-4 mb-6">
           <AvatarUpload
