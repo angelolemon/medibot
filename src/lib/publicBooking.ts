@@ -5,6 +5,7 @@ export interface PublicDoctor {
   first_name: string
   last_name: string
   specialty: string
+  license: string | null
   bio: string
   phone: string
   email: string
@@ -28,7 +29,7 @@ export interface DaySlots {
 export async function getDoctorByBookingCode(code: string): Promise<PublicDoctor | null> {
   const { data } = await supabase
     .from('profiles')
-    .select('id, first_name, last_name, specialty, bio, phone, email, address, city, work_days, work_from, work_to, session_duration, price_particular, booking_code, avatar_url')
+    .select('id, first_name, last_name, specialty, license, bio, phone, email, address, city, work_days, work_from, work_to, session_duration, price_particular, booking_code, avatar_url')
     .eq('booking_code', code)
     .single()
   return data

@@ -481,6 +481,14 @@ function DoctorSidebar({
       >
         {doctor.first_name} {doctor.last_name}
       </div>
+      {doctor.license && (
+        <div
+          className="text-[11px] text-text-hint mt-1.5"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          MN · {doctor.license}
+        </div>
+      )}
 
       {doctor.bio && (
         <div
@@ -805,10 +813,13 @@ function SlotRail({
   }
 
   const d = new Date(currentDay.date + 'T12:00:00')
-  const dayNames = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+  const dayNamesShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
   const monthsShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-  const dow = dayNames[d.getDay()]
+  const dow = dayNamesShort[d.getDay()]
   const short = `${d.getDate()} ${monthsShort[d.getMonth()]}`
+  const todayISO = toISO(new Date())
+  const isToday = currentDay.date === todayISO
+  const railLabel = isToday ? 'Horarios del hoy' : `Horarios del ${dow.toLowerCase()}`
 
   // Split slots into morning (< 13:00) and afternoon (>= 13:00)
   const morning = currentDay.slots.filter((s) => parseInt(s.split(':')[0], 10) < 13)
@@ -820,13 +831,13 @@ function SlotRail({
         className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1.5"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
-        Horarios
+        {railLabel}
       </div>
       <div
         className="text-[26px] font-medium leading-[1.1] tracking-[-0.02em] text-text"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
-        <span className="italic capitalize">{dow}</span> {short}
+        <span className="italic">{dow}</span> {short}
       </div>
 
       <div className="mt-6 flex-1">
