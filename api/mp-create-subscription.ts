@@ -66,14 +66,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const mpPlanId = planId === 'clinic' ? MP_PLAN_ID_CLINIC : MP_PLAN_ID_PRO
   if (!mpPlanId) return res.status(500).json({ error: 'plan_not_configured' })
 
-  // Redirect flow: don't send external_reference — the "suscripción con plan"
-  // checkout rejects extra query params with SUB03. Instead, we match the user
-  // on webhook by payer_email (MP gives us the email the payer used to check
-  // out) against profiles.email. payer_email hint can be pre-filled so the
-  // user doesn't have to retype.
+  // Redirect flow: MP's "suscripción con plan" checkout rejects any extra
+  // query param (external_reference, payer_email, back_url) with SUB03. We
+  // send only preapproval_plan_id and reconcile the user on webhook by
+  // matching payer_email (returned by MP API) against profiles.email.
   const initPoint = new URL('https://www.mercadopago.com.ar/subscriptions/checkout')
   initPoint.searchParams.set('preapproval_plan_id', mpPlanId)
-  if (userEmail) initPoint.searchParams.set('payer_email', userEmail)
+  // Intentionally no payer_email / external_reference — they trigger SUB03.
+  void userEmail
 
   // Audit log
   try {
