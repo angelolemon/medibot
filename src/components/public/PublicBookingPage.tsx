@@ -164,8 +164,15 @@ export default function PublicBookingPage({ bookingCode }: Props) {
       className="min-h-screen flex flex-col"
       style={{ background: 'var(--color-bg)', fontFamily: 'var(--font-sans)', color: 'var(--color-text)' }}
     >
+      {/* SEO: hidden single H1 for screen readers + crawlers */}
+      <h1 className="sr-only">
+        Reservá turno con {doctor.first_name} {doctor.last_name}
+        {doctor.specialty ? ` — ${doctor.specialty}` : ''}
+        {fullAddress ? ` en ${fullAddress}` : ''}
+      </h1>
+
       {/* Header */}
-      <div className="bg-surface border-b border-gray-border">
+      <header className="bg-surface border-b border-gray-border" role="banner">
         <div className="px-6 lg:px-10 py-3.5 flex items-center justify-between">
           <div className="flex items-baseline gap-3">
             <div
@@ -188,15 +195,23 @@ export default function PublicBookingPage({ bookingCode }: Props) {
             <Icon name="check" size={10} /> Conexión segura
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Mobile: compact doctor header above accordion */}
-      <div className="lg:hidden bg-surface border-b border-gray-border px-6 py-5">
+      <section className="lg:hidden bg-surface border-b border-gray-border px-6 py-5" aria-label="Profesional">
         <div className="flex items-start gap-4">
           <div className="w-[60px] h-[60px] rounded-full bg-primary-light text-primary grid place-items-center text-[18px] shrink-0 overflow-hidden"
             style={{ fontFamily: 'var(--font-serif)' }}>
             {doctor.avatar_url ? (
-              <img src={doctor.avatar_url} alt="" className="w-full h-full object-cover" />
+              <img
+                src={doctor.avatar_url}
+                alt={`Foto de ${doctor.first_name} ${doctor.last_name}`}
+                width={60}
+                height={60}
+                loading="eager"
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
             ) : (
               initials
             )}
@@ -236,10 +251,10 @@ export default function PublicBookingPage({ bookingCode }: Props) {
             )}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* DESKTOP — 3 column layout (sidebar · calendar · rail) */}
-      <div className="hidden lg:grid lg:grid-cols-[280px_1fr_380px] flex-1 min-h-0">
+      <main className="hidden lg:grid lg:grid-cols-[280px_1fr_380px] flex-1 min-h-0" role="main">
         <DoctorSidebar
           doctor={doctor}
           initials={initials}
@@ -287,10 +302,10 @@ export default function PublicBookingPage({ bookingCode }: Props) {
             />
           </>
         )}
-      </div>
+      </main>
 
       {/* MOBILE — accordion list */}
-      <div className="lg:hidden flex-1 flex flex-col">
+      <main className="lg:hidden flex-1 flex flex-col" role="main">
         {/* Location picker if multi */}
         {locations.length > 1 && (
           <div className="px-4 pt-5">
@@ -413,19 +428,22 @@ export default function PublicBookingPage({ bookingCode }: Props) {
             </div>
           </div>
         )}
-      </div>
+      </main>
 
       {/* Footer */}
-      <div
+      <footer
         className="text-[10px] text-text-hint uppercase tracking-[0.18em] py-4 px-6 lg:px-10 border-t border-gray-border flex items-center justify-between"
         style={{ fontFamily: 'var(--font-mono)' }}
+        role="contentinfo"
       >
-        <div>MediBot · reservá con cualquier médico</div>
-        <div className="hidden sm:flex gap-4">
-          <a className="hover:text-text cursor-pointer">Ayuda</a>
-          <a className="hover:text-text cursor-pointer">Privacidad</a>
+        <div>
+          <a href="/" className="hover:text-text cursor-pointer">MediBot</a> · reservá con cualquier médico
         </div>
-      </div>
+        <nav className="hidden sm:flex gap-4" aria-label="Enlaces de ayuda">
+          <a href="/ayuda" className="hover:text-text cursor-pointer">Ayuda</a>
+          <a href="/privacy" className="hover:text-text cursor-pointer">Privacidad</a>
+        </nav>
+      </footer>
 
       {openBooking && selectedSlot && (
         <BookingModal
@@ -474,7 +492,16 @@ function DoctorSidebar({
         style={{ fontFamily: 'var(--font-serif)' }}
       >
         {doctor.avatar_url ? (
-          <img src={doctor.avatar_url} alt="" className="w-full h-full object-cover" />
+          <img
+            src={doctor.avatar_url}
+            alt={`Foto de ${doctor.first_name} ${doctor.last_name}`}
+            width={48}
+            height={48}
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            className="w-full h-full object-cover"
+          />
         ) : (
           initials
         )}

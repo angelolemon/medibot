@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Background: bone / clinical calm palette -->
+  <rect width="1200" height="630" fill="#F5F2EC"/>
+
+  <!-- Subtle sage panel on the right -->
+  <rect x="780" y="0" width="420" height="630" fill="#3B4A38"/>
+
+  <!-- Hairline grid (monochrome) -->
+  <g stroke="#D9D4CA" stroke-width="1">
+    <line x1="80" y1="120" x2="1120" y2="120"/>
+    <line x1="80" y1="510" x2="1120" y2="510"/>
+  </g>
+
+  <!-- Eyebrow mono uppercase -->
+  <text x="80" y="108" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace"
+        font-size="18" letter-spacing="2.5" fill="#6B685E">
+    AGENDA PROFESIONAL · TURNOS ONLINE
+  </text>
+
+  <!-- Headline — serif with italic fragment -->
+  <text x="80" y="260" font-family="'Newsreader', 'Times New Roman', serif"
+        font-size="88" font-weight="400" fill="#2A2D26" letter-spacing="-2">
+    <tspan>La agenda</tspan>
+  </text>
+  <text x="80" y="360" font-family="'Newsreader', 'Times New Roman', serif"
+        font-size="88" font-weight="400" fill="#2A2D26" letter-spacing="-2">
+    <tspan>de tu consultorio,</tspan>
+  </text>
+  <text x="80" y="460" font-family="'Newsreader', 'Times New Roman', serif"
+        font-size="88" font-weight="400" font-style="italic" fill="#3B4A38" letter-spacing="-2">
+    <tspan>simple.</tspan>
+  </text>
+
+  <!-- Footer row -->
+  <text x="80" y="568" font-family="'Inter', system-ui, sans-serif"
+        font-size="22" fill="#2A2D26">
+    medibot.ar
+  </text>
+  <text x="80" y="598" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace"
+        font-size="14" letter-spacing="1.5" fill="#6B685E">
+    TURNOS · RECORDATORIOS · MULTI-CONSULTORIO
+  </text>
+
+  <!-- Sage panel mark -->
+  <g transform="translate(990, 230)">
+    <circle cx="0" cy="0" r="110" fill="#F5F2EC"/>
+    <text x="0" y="22" text-anchor="middle" font-family="'Newsreader', serif"
+          font-size="96" font-style="italic" fill="#3B4A38">M</text>
+  </g>
+  <text x="990" y="420" text-anchor="middle" font-family="'Newsreader', serif"
+        font-size="28" font-style="italic" fill="#F5F2EC">MediBot</text>
+  <text x="990" y="460" text-anchor="middle" font-family="'Geist Mono', monospace"
+        font-size="13" letter-spacing="2" fill="#A8B1A2">AR · 2026</text>
+</svg>

@@ -24,13 +24,14 @@ import JoinOrgView from './components/org/JoinOrgView'
 import CreateOrgModal from './components/org/CreateOrgModal'
 import OnboardingWizard from './components/onboarding/OnboardingWizard'
 import PublicBookingPage from './components/public/PublicBookingPage'
+import NotFoundView from './components/public/NotFoundView'
 import Icon from './components/Icon'
 import Btn from './components/Btn'
 import PageHeader from './components/PageHeader'
 import NewAppointmentModal from './components/agenda/NewAppointmentModal'
 import RemindersModal from './components/agenda/RemindersModal'
 
-type AuthScreen = 'loading' | 'login' | 'register' | 'onboarding' | 'join-org' | 'app' | 'public-booking'
+type AuthScreen = 'loading' | 'login' | 'register' | 'onboarding' | 'join-org' | 'app' | 'public-booking' | 'not-found'
 type AgendaMode = 'week' | 'month'
 
 export default function App() {
@@ -41,11 +42,19 @@ export default function App() {
   const [publicBookingCode, setPublicBookingCode] = useState<string | null>(null)
 
   useEffect(() => {
+    const pathname = window.location.pathname
+
     // Detect public booking URL: /p/:code
-    const pathMatch = window.location.pathname.match(/^\/p\/([a-f0-9]{8})\/?$/)
+    const pathMatch = pathname.match(/^\/p\/([a-f0-9]{8})\/?$/)
     if (pathMatch) {
       setPublicBookingCode(pathMatch[1])
       setAuthScreen('public-booking')
+      return
+    }
+
+    // Any other /p/* shape (wrong length / invalid chars) is a public 404.
+    if (/^\/p(\/|$)/.test(pathname)) {
+      setAuthScreen('not-found')
       return
     }
 
@@ -126,6 +135,10 @@ export default function App() {
 
   if (authScreen === 'public-booking' && publicBookingCode) {
     return <PublicBookingPage bookingCode={publicBookingCode} />
+  }
+
+  if (authScreen === 'not-found') {
+    return <NotFoundView />
   }
 
   if (authScreen === 'loading') {

@@ -1,8 +1,44 @@
 {
+  "cleanUrls": true,
   "rewrites": [
     { "source": "/ics/:code.ics", "destination": "https://wyrpnsszzlzhvhxtwlzg.supabase.co/functions/v1/ics-feed/:code.ics" },
     { "source": "/ics/:code", "destination": "https://wyrpnsszzlzhvhxtwlzg.supabase.co/functions/v1/ics-feed/:code" },
-    { "source": "/p/:code", "destination": "/" },
-    { "source": "/(.*)", "destination": "/" }
+    { "source": "/((?!p/|assets/|ics/|og-default|favicon|apple-touch-icon|icon-|manifest|robots|sitemap|404|privacy).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*)\\.(svg|png|ico|webp|avif|jpg|jpeg)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/sitemap.xml",
+      "headers": [
+        { "key": "Content-Type", "value": "application/xml" },
+        { "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        { "key": "Content-Type", "value": "text/plain; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/((?!assets/).*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), interest-cohort=()" }
+      ]
+    }
   ]
 }
