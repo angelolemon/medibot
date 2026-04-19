@@ -10,3 +10,24 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/ics-feed/deno.json"
 entrypoint = "./functions/ics-feed/index.ts"
+
+# MercadoPago: webhook listens without JWT (MP is the caller; we verify HMAC)
+[functions.mp-webhook]
+enabled = true
+verify_jwt = false
+import_map = "./functions/mp-webhook/deno.json"
+entrypoint = "./functions/mp-webhook/index.ts"
+
+# MP: create subscription (called from the web app with the user's JWT)
+[functions.mp-create-subscription]
+enabled = true
+verify_jwt = false
+import_map = "./functions/mp-create-subscription/deno.json"
+entrypoint = "./functions/mp-create-subscription/index.ts"
+
+# MP: cancel subscription
+[functions.mp-cancel-subscription]
+enabled = true
+verify_jwt = false
+import_map = "./functions/mp-cancel-subscription/deno.json"
+entrypoint = "./functions/mp-cancel-subscription/index.ts"

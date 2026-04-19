@@ -3,7 +3,8 @@ export type PlanId = 'free' | 'pro' | 'clinic'
 export interface Plan {
   id: PlanId
   name: string
-  price: number // USD per month
+  /** Monthly price in ARS. */
+  price: number
   description: string
   features: string[]
   highlighted?: boolean
@@ -13,6 +14,21 @@ export interface Plan {
     customBranding: boolean
     stats: boolean
   }
+}
+
+/** Trial length (in days) when a doctor starts a paid plan for the first time. */
+export const TRIAL_DAYS = 14
+
+/**
+ * Format an ARS amount for display: "$18.000".
+ * We round to the nearest peso — no decimals, Argentine locale grouping.
+ */
+export function formatARS(value: number): string {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(value)
 }
 
 export const PLANS: Record<PlanId, Plan> = {
@@ -39,7 +55,7 @@ export const PLANS: Record<PlanId, Plan> = {
   pro: {
     id: 'pro',
     name: 'Pro',
-    price: 19,
+    price: 18000,
     description: 'Para profesionales independientes.',
     highlighted: true,
     features: [
@@ -60,7 +76,7 @@ export const PLANS: Record<PlanId, Plan> = {
   clinic: {
     id: 'clinic',
     name: 'Clinic',
-    price: 49,
+    price: 45000,
     description: 'Para consultorios y clínicas.',
     features: [
       'Todo lo de Pro',

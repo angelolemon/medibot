@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
-import { PLANS, type PlanId } from '../../lib/plans'
-import { billingWhatsappLink } from '../../lib/billing'
+import { PLANS, TRIAL_DAYS, formatARS, type PlanId } from '../../lib/plans'
+import {
+  cancelSubscription,
+  describeStatus,
+  getBillingState,
+  startCheckout,
+  type BillingState,
+} from '../../lib/billing'
 import Icon from '../Icon'
 import Btn from '../Btn'
 
@@ -12,66 +17,67 @@ interface Props {
   onPlanChanged?: (plan: PlanId) => void
 }
 
-type BillingCycle = 'monthly' | 'yearly'
-
 const PLAN_ORDER: PlanId[] = ['free', 'pro', 'clinic']
 
-export default function PlansView({ currentPlan, userId, onClose, onPlanChanged }: Props) {
+export default function PlansView({ currentPlan, userId, onClose }: Props) {
   const [saving, setSaving] = useState<PlanId | null>(null)
-  const [billing, setBilling] = useState<BillingCycle>('monthly')
-  const [doctorName, setDoctorName] = useState('')
-  const [doctorEmail, setDoctorEmail] = useState('')
-  const [contacted, setContacted] = useState<PlanId | null>(null)
+  const [state, setState] = useState<BillingState | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('first_name, last_name, email')
-        .eq('id', userId)
-        .single()
-      if (alive && data) {
-        setDoctorName(`${data.first_name ?? ''} ${data.last_name ?? ''}`.trim())
-        setDoctorEmail(data.email ?? '')
-      }
+      const s = await getBillingState(userId)
+      if (alive) setState(s)
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [userId])
 
   const handleChoose = async (planId: PlanId) => {
     if (planId === currentPlan) return
+    setError(null)
 
-    const plan = PLANS[planId]
-
-    // Free plan — no billing, apply directly.
-    if (plan.price === 0) {
-      setSaving(planId)
-      const { error } = await supabase.from('profiles').update({ plan: planId }).eq('id', userId)
-      setSaving(null)
-      if (!error) {
-        onPlanChanged?.(planId)
-        if (onClose) onClose()
-      } else {
-        alert('Error al cambiar de plan: ' + error.message)
-      }
+    // Free: no checkout, just flip the plan locally. (We only allow this path
+    // from an admin UI; for end users, downgrade happens via cancel.)
+    if (planId === 'free') {
+      setError('Para volver a Free cancelá tu plan actual desde el resumen.')
       return
     }
 
-    // Paid plans — manual billing via WhatsApp for now.
-    const url = billingWhatsappLink({
-      planName: plan.name,
-      planPrice: plan.price,
-      period: billing,
-      doctorName,
-      doctorEmail,
-    })
-    window.open(url, '_blank', 'noopener')
-    setContacted(planId)
+    try {
+      setSaving(planId)
+      await startCheckout(planId)
+      // The tab navigates to MercadoPago; on success MP redirects back with
+      // ?upgrade=success, at which point the user comes back to this view.
+    } catch (err) {
+      setSaving(null)
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!confirm('¿Seguro que querés cancelar? Seguís con los beneficios hasta la próxima fecha de cobro.')) return
+    setError(null)
+    setCancelling(true)
+    try {
+      await cancelSubscription()
+      const fresh = await getBillingState(userId)
+      setState(fresh)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCancelling(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-bg overflow-y-auto" style={{ fontFamily: 'var(--font-sans)', color: 'var(--color-text)' }}>
+    <div
+      className="min-h-screen bg-bg overflow-y-auto"
+      style={{ fontFamily: 'var(--font-sans)', color: 'var(--color-text)' }}
+    >
       {/* Top bar */}
       <div className="bg-surface border-b border-gray-border px-6 md:px-10 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3.5">
@@ -111,54 +117,57 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
             className="text-[40px] md:text-[56px] font-normal tracking-[-0.035em] leading-[1] mt-3.5 mb-4"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
-            Un precio justo,{' '}
-            <span className="italic text-primary">sin sorpresas.</span>
+            Un precio justo, <span className="italic text-primary">sin sorpresas.</span>
           </h1>
           <p className="text-[15px] text-text-muted max-w-[560px] mx-auto leading-[1.6]">
-            Empezás gratis con hasta 10 pacientes. Pagás solo cuando necesites más.
+            Empezás gratis con hasta 10 pacientes. Probás Pro {TRIAL_DAYS} días sin cargo — cancelás cuando quieras.
           </p>
-
-          {/* Billing toggle */}
-          <div className="inline-flex items-center gap-1 mt-7 p-1 bg-surface border border-gray-border rounded-full">
-            {(['monthly', 'yearly'] as const).map((b) => {
-              const active = billing === b
-              return (
-                <button
-                  key={b}
-                  onClick={() => setBilling(b)}
-                  className={`px-4 py-[7px] rounded-full text-[12px] font-medium cursor-pointer transition-colors flex items-center gap-2 ${
-                    active ? 'bg-primary text-surface' : 'text-text-muted hover:text-text'
-                  }`}
-                >
-                  {b === 'monthly' ? 'Mensual' : 'Anual'}
-                  {b === 'yearly' && (
-                    <span
-                      className={`px-2 py-[1px] rounded-full text-[10px] font-semibold ${
-                        active ? 'bg-white/20 text-surface' : 'bg-teal-light text-teal'
-                      }`}
-                      style={{ fontFamily: 'var(--font-mono)' }}
-                    >
-                      -20%
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
         </div>
 
-        {/* Billing flow notice */}
-        {contacted && (
-          <div className="max-w-[560px] mx-auto mb-10 bg-teal-light border border-teal/20 rounded-[12px] px-5 py-4 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-teal text-surface grid place-items-center shrink-0">
-              <Icon name="check" size={14} stroke={2} />
+        {/* Subscription status banner */}
+        {state && state.plan !== 'free' && (
+          <div className="max-w-[560px] mx-auto mb-10 bg-surface border border-gray-border rounded-[12px] px-5 py-4 flex items-start gap-3">
+            <div
+              className={`w-8 h-8 rounded-full grid place-items-center shrink-0 ${
+                state.status === 'past_due'
+                  ? 'bg-coral-light text-coral'
+                  : state.status === 'cancelled'
+                    ? 'bg-surface-2 text-text-hint'
+                    : 'bg-teal-light text-teal'
+              }`}
+            >
+              <Icon
+                name={state.status === 'past_due' ? 'alert' : state.status === 'cancelled' ? 'x' : 'check'}
+                size={14}
+                stroke={2}
+              />
             </div>
-            <div>
-              <div className="text-[13px] font-medium text-teal">Te escribimos por WhatsApp.</div>
-              <div className="text-[12px] text-text-muted mt-1 leading-[1.55]">
-                Te respondemos en menos de 24hs con el medio de pago. Mientras tanto podés seguir usando tu plan actual.
+            <div className="flex-1">
+              <div className="text-[13px] font-medium text-text">
+                {PLANS[state.plan].name} · {describeStatus(state)}
               </div>
+              {(state.status === 'active' || state.status === 'trialing') && state.preapprovalId && (
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="text-[12px] text-text-hint mt-1.5 underline hover:text-coral disabled:opacity-60 cursor-pointer"
+                >
+                  {cancelling ? 'Cancelando…' : 'Cancelar suscripción'}
+                </button>
+              )}
+              {state.status === 'past_due' && (
+                <div className="text-[12px] text-text-muted mt-1 leading-[1.55]">
+                  Tu última renovación fue rechazada. Actualizá el medio de pago desde tu cuenta de MercadoPago o
+                  re-suscribite desde abajo.
+                </div>
+              )}
             </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="max-w-[560px] mx-auto mb-10 text-[13px] text-coral bg-coral-light rounded-[12px] px-4 py-3">
+            {error}
           </div>
         )}
 
@@ -168,9 +177,6 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
             const plan = PLANS[id]
             const isCurrent = currentPlan === id
             const isHighlighted = !!plan.highlighted
-            const monthlyPrice = plan.price
-            const displayedPrice =
-              billing === 'yearly' ? Math.round(monthlyPrice * 0.8) : monthlyPrice
 
             return (
               <div
@@ -207,7 +213,11 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
                   >
                     {plan.name}
                   </div>
-                  <div className={`text-[12px] mt-1 ${isHighlighted ? 'text-surface opacity-75' : 'text-text-muted'}`}>
+                  <div
+                    className={`text-[12px] mt-1 ${
+                      isHighlighted ? 'text-surface opacity-75' : 'text-text-muted'
+                    }`}
+                  >
                     {plan.description}
                   </div>
                 </div>
@@ -217,18 +227,22 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
                     className="text-[42px] md:text-[46px] font-normal tracking-[-0.03em] leading-[1]"
                     style={{ fontFamily: 'var(--font-serif)' }}
                   >
-                    {monthlyPrice === 0 ? 'Gratis' : `$${displayedPrice}`}
+                    {plan.price === 0 ? 'Gratis' : formatARS(plan.price)}
                   </div>
-                  {monthlyPrice > 0 && (
-                    <div className={`text-[13px] ${isHighlighted ? 'text-surface opacity-70' : 'text-text-hint'}`}>
-                      USD / mes
+                  {plan.price > 0 && (
+                    <div
+                      className={`text-[13px] ${
+                        isHighlighted ? 'text-surface opacity-70' : 'text-text-hint'
+                      }`}
+                    >
+                      ARS / mes
                     </div>
                   )}
                 </div>
 
                 <button
                   onClick={() => handleChoose(id)}
-                  disabled={isCurrent || saving === id}
+                  disabled={isCurrent || saving === id || plan.price === 0}
                   className={`w-full py-[11px] rounded-[10px] text-[13px] font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 transition-colors mb-5 inline-flex items-center justify-center gap-2 ${
                     isCurrent
                       ? isHighlighted
@@ -240,18 +254,15 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
                   }`}
                 >
                   {saving === id ? (
-                    'Cambiando…'
+                    'Redirigiendo…'
                   ) : isCurrent ? (
                     'Plan actual'
-                  ) : monthlyPrice === 0 ? (
-                    'Usar gratis'
-                  ) : contacted === id ? (
-                    <>
-                      <Icon name="check" size={13} /> Te escribimos
-                    </>
+                  ) : plan.price === 0 ? (
+                    'Se activa al cancelar'
                   ) : (
                     <>
-                      <Icon name="chat" size={13} /> Contratar por WhatsApp
+                      {plan.price > 0 && state?.status === 'past_due' ? 'Reactivar' : `Probar ${TRIAL_DAYS} días`}
+                      <span className="opacity-70">→</span>
                     </>
                   )}
                 </button>
@@ -299,9 +310,10 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
               Las más frecuentes.
             </h3>
             {[
-              ['¿Qué pasa si cancelo?', 'No hay cargo — mantenés acceso hasta el fin del ciclo.'],
+              ['¿Cuándo se hace el primer cobro?', `Después de los ${TRIAL_DAYS} días de prueba gratis. Cancelás antes sin cargo.`],
+              ['¿Qué pasa si cancelo?', 'Mantenés acceso hasta la próxima fecha de cobro. Después volvés automáticamente a Free.'],
+              ['¿Con qué tarjeta puedo pagar?', 'MercadoPago acepta Visa, Mastercard y Amex — crédito y débito.'],
               ['¿Pueden migrar mis pacientes actuales?', 'Sí. Importamos tu planilla de Excel en minutos.'],
-              ['¿Los datos están seguros?', 'Servidores en Argentina, cifrado de extremo a extremo, HIPAA-compliant.'],
             ].map(([q, a]) => (
               <div key={q} className="py-3 border-t border-gray-border">
                 <div className="text-[13px] font-medium text-text">{q}</div>
@@ -329,7 +341,9 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
               </p>
             </div>
             <div className="flex gap-2 mt-5">
-              <Btn variant="primary"><Icon name="chat" size={13} /> Agendar demo</Btn>
+              <Btn variant="primary">
+                <Icon name="chat" size={13} /> Agendar demo
+              </Btn>
               <Btn>Escribinos</Btn>
             </div>
           </div>
@@ -339,7 +353,7 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
           className="text-center text-[11px] text-text-hint uppercase tracking-[0.18em]"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          precios en USD · coordinamos pago por WhatsApp · factura B AR o invoice USA
+          cobro automático vía MercadoPago · factura al email · cancelás cuando quieras
         </div>
       </div>
     </div>

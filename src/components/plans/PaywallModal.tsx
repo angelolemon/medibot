@@ -1,4 +1,4 @@
-import { PLANS, type PlanId } from '../../lib/plans'
+import { PLANS, TRIAL_DAYS, formatARS, type PlanId } from '../../lib/plans'
 import Icon from '../Icon'
 import Btn from '../Btn'
 
@@ -74,13 +74,13 @@ export default function PaywallModal({ title, description, requiredPlan, onClose
                   className="text-[28px] tracking-[-0.025em] leading-none text-text"
                   style={{ fontFamily: 'var(--font-serif)' }}
                 >
-                  ${plan.price}
+                  {formatARS(plan.price)}
                 </div>
                 <div
                   className="text-[10px] text-text-hint mt-1"
                   style={{ fontFamily: 'var(--font-mono)' }}
                 >
-                  USD / mes
+                  ARS / mes · {TRIAL_DAYS} días gratis
                 </div>
               </div>
             </div>
