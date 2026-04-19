@@ -120,14 +120,24 @@ async function handlePreapproval(preapprovalId: string) {
   const pre = await mpGet<MPPreapproval>(`/preapproval/${preapprovalId}`)
   if (!pre) return
 
-  // Resolve our user. Preferred path: external_reference (set when we POST
-  // create the preapproval directly). Fallback: payer_email against profiles —
-  // used by the "suscripción con plan" redirect flow, which rejects
-  // external_reference as a query param.
+  // Resolve our user. Priority:
+  //   1. external_reference (set when we POST create the preapproval directly)
+  //   2. profiles.mp_preapproval_id — set by our /api/mp-link-subscription on
+  //      the back_url handshake. This is the primary path after the initial
+  //      checkout: every subsequent webhook for renewal/pause/cancel lands
+  //      here and matches by preapproval id, which never changes.
+  //   3. payer_email — best-effort fallback. MP often returns it empty for
+  //      "suscripción con plan" flows, so this rarely hits.
   let userId: string | null = pre.external_reference || null
+  if (!userId) {
+    const { data } = await admin()
+      .from('profiles')
+      .select('id')
+      .eq('mp_preapproval_id', pre.id)
+      .maybeSingle()
+    userId = (data?.id as string | null) ?? null
+  }
   if (!userId && pre.payer_email) {
-    // Case-insensitive match: Supabase stores whatever casing the user signed
-    // up with, MP normalizes to whatever the payer entered.
     const { data } = await admin()
       .from('profiles')
       .select('id')
