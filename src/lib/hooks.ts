@@ -130,6 +130,7 @@ export interface AppointmentRow {
   id: string
   doctor_id: string
   patient_id: string | null
+  location_id: string | null
   date: string
   time: string
   duration: string
@@ -138,8 +139,9 @@ export interface AppointmentRow {
   status: string
 }
 
-function rowToAppointment(row: AppointmentRow & { patients?: any }): Appointment {
+function rowToAppointment(row: AppointmentRow & { patients?: any; locations?: any }): Appointment {
   const p = row.patients
+  const l = row.locations
   return {
     id: row.id,
     date: row.date,
@@ -148,6 +150,10 @@ function rowToAppointment(row: AppointmentRow & { patients?: any }): Appointment
     patientName: row.patient_name || p?.name || null,
     detail: row.detail || '',
     status: (row.status || 'libre') as Appointment['status'],
+    locationId: row.location_id ?? null,
+    locationName: l?.name ?? null,
+    locationAddress: l?.address ?? null,
+    locationCity: l?.city ?? null,
     patient: p ? {
       name: p.name || '',
       phone: p.phone || '',
@@ -171,7 +177,7 @@ export function useAppointments(userId: string | null) {
     if (!userId) return
     const { data } = await supabase
       .from('appointments')
-      .select('*, patients(name, phone, email, age, since, insurance, last_visit, total_sessions, tags)')
+      .select('*, patients(name, phone, email, age, since, insurance, last_visit, total_sessions, tags), locations(id, name, address, city)')
       .eq('doctor_id', userId)
       .order('date')
       .order('time')
@@ -237,7 +243,7 @@ export function useOrgAppointments(orgId: string | null) {
 
     const { data } = await supabase
       .from('appointments')
-      .select('*, patients(name, phone, email, age, since, insurance, last_visit, total_sessions, tags)')
+      .select('*, patients(name, phone, email, age, since, insurance, last_visit, total_sessions, tags), locations(id, name, address, city)')
       .in('doctor_id', doctorIds)
       .order('date')
       .order('time')
@@ -592,4 +598,83 @@ export function useBotTemplates(userId: string | null) {
   }
 
   return { templates, loading, refetch: fetch, upsert, toggle }
+}
+
+// ============ LOCATIONS ============
+
+export interface LocationRow {
+  id: string
+  doctor_id: string
+  name: string
+  address: string
+  city: string
+  notes: string
+  work_days: string[]
+  work_from: string | null
+  work_to: string | null
+  is_primary: boolean
+  created_at: string
+}
+
+export function useLocations(userId: string | null) {
+  const [locations, setLocations] = useState<LocationRow[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetch = useCallback(async () => {
+    if (!userId) return
+    const { data } = await supabase
+      .from('locations')
+      .select('*')
+      .eq('doctor_id', userId)
+      .order('is_primary', { ascending: false })
+      .order('created_at')
+    if (data) setLocations(data as LocationRow[])
+    setLoading(false)
+  }, [userId])
+
+  useEffect(() => { fetch() }, [fetch])
+
+  const add = async (loc: Omit<LocationRow, 'id' | 'doctor_id' | 'created_at'>) => {
+    if (!userId) return { error: { message: 'no user' } }
+    const { error, data } = await supabase
+      .from('locations')
+      .insert({ ...loc, doctor_id: userId })
+      .select()
+      .single()
+    if (!error) fetch()
+    return { error, data: data as LocationRow | null }
+  }
+
+  const update = async (id: string, patch: Partial<Omit<LocationRow, 'id' | 'doctor_id' | 'created_at'>>) => {
+    const { error } = await supabase.from('locations').update(patch).eq('id', id)
+    if (!error) fetch()
+    return error
+  }
+
+  const remove = async (id: string) => {
+    const { error } = await supabase.from('locations').delete().eq('id', id)
+    if (!error) fetch()
+    return error
+  }
+
+  const setPrimary = async (id: string) => {
+    if (!userId) return
+    // Clear all primaries for this doctor, set the new one
+    await supabase.from('locations').update({ is_primary: false }).eq('doctor_id', userId)
+    await supabase.from('locations').update({ is_primary: true }).eq('id', id)
+    fetch()
+  }
+
+  return { locations, loading, refetch: fetch, add, update, remove, setPrimary }
+}
+
+/** Public fetch of a doctor's locations by their id — used on the public booking page. */
+export async function getPublicLocations(doctorId: string): Promise<LocationRow[]> {
+  const { data } = await supabase
+    .from('locations')
+    .select('*')
+    .eq('doctor_id', doctorId)
+    .order('is_primary', { ascending: false })
+    .order('created_at')
+  return (data as LocationRow[]) || []
 }

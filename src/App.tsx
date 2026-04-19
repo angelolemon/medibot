@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabase'
-import { initialAppointments, allPatients, getWeekForDate, shiftWeek, getDatesBetween, type Appointment, type Patient, type DateBlock } from './data/appointments'
-import { useProfile, usePatients, useAppointments, useOrgAppointments, useOrgPatients, useDateBlocks, useOrgDateBlocks, useOrganizations, type Organization } from './lib/hooks'
+import { getWeekForDate, shiftWeek, getDatesBetween, type Appointment, type Patient, type DateBlock } from './data/appointments'
+import { useProfile, usePatients, useAppointments, useOrgAppointments, useOrgPatients, useDateBlocks, useOrgDateBlocks, useOrganizations, useLocations, type Organization } from './lib/hooks'
 import { applyOrgTheme, clearOrgTheme } from './lib/theme'
 import Sidebar, { type View } from './components/layout/Sidebar'
 import MobileNav from './components/layout/MobileNav'
@@ -13,11 +13,10 @@ import PatientDetailPanel from './components/patients/PatientDetailPanel'
 import BlocksView from './components/blocks/BlocksView'
 import MonthCalendar from './components/agenda/MonthCalendar'
 import StatsView from './components/stats/StatsView'
-import BotConfigView from './components/config/BotConfigView'
 import DoctorProfileView from './components/profile/DoctorProfileView'
 import PlansView from './components/plans/PlansView'
 import PaywallModal from './components/plans/PaywallModal'
-import { canUseBot, canCreateOrg, type PlanId } from './lib/plans'
+import { canAddPatient, canCreateOrg, canCustomBranding, PLANS, type PlanId } from './lib/plans'
 import LoginView from './components/auth/LoginView'
 import RegisterView from './components/auth/RegisterView'
 import OrgAdminView from './components/org/OrgAdminView'
@@ -28,6 +27,8 @@ import PublicBookingPage from './components/public/PublicBookingPage'
 import Icon from './components/Icon'
 import Btn from './components/Btn'
 import PageHeader from './components/PageHeader'
+import NewAppointmentModal from './components/agenda/NewAppointmentModal'
+import RemindersModal from './components/agenda/RemindersModal'
 
 type AuthScreen = 'loading' | 'login' | 'register' | 'onboarding' | 'join-org' | 'app' | 'public-booking'
 type AgendaMode = 'week' | 'month'
@@ -184,6 +185,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [showCreateOrg, setShowCreateOrg] = useState(false)
   const [showPlans, setShowPlans] = useState(false)
   const [paywall, setPaywall] = useState<{ title: string; description: string; requiredPlan: 'pro' | 'clinic' } | null>(null)
+  const [showNewAppointment, setShowNewAppointment] = useState(false)
+  const [reasignarFor, setReasignarFor] = useState<Patient | null>(null)
+  const [modalIntent, setModalIntent] = useState<'new' | 'reasignar' | 'schedule-for-patient'>('new')
+  const [remindersMode, setRemindersMode] = useState<'day' | Appointment | null>(null)
 
   // Load user ID
   useEffect(() => {
@@ -195,12 +200,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   // Supabase data hooks
   const { profile } = useProfile(userId)
   const { organizations, memberships, create: createOrg } = useOrganizations(userId)
-  const { patients: supaPatients, loading: patientsLoading } = usePatients(userId)
+  const { patients: supaPatients, patientRows: supaPatientRows, loading: patientsLoading, add: addPatient, remove: removePatient } = usePatients(userId)
   const { appointments: supaAppointments, loading: apptsLoading, updateStatus: updateApptStatus, add: addAppointment } = useAppointments(userId)
   const { appointments: orgAppointments } = useOrgAppointments(currentOrg?.id ?? null)
   const { patients: orgPatients } = useOrgPatients(currentOrg?.id ?? null)
   const { blocks: orgBlocks } = useOrgDateBlocks(currentOrg?.id ?? null)
   const { blocks: supaBlocks, loading: blocksLoading, add: addBlock, remove: removeBlock } = useDateBlocks(userId)
+  const { locations } = useLocations(userId)
 
   // Apply org theme
   useEffect(() => {
@@ -212,14 +218,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     return () => clearOrgTheme()
   }, [currentOrg])
 
-  // Fall back to mock data while Supabase is empty or loading
+  // Only real Supabase data — no mock fallbacks.
   const hasSupaData = supaAppointments.length > 0
-  const personalAppointments = hasSupaData ? supaAppointments : initialAppointments
-  const appointments = currentOrg ? orgAppointments : personalAppointments
-  const personalPatients = supaPatients.length > 0 ? supaPatients : allPatients
-  const patients = currentOrg ? orgPatients : personalPatients
-  const personalBlocks = supaBlocks.length > 0 ? supaBlocks : []
-  const blocks = currentOrg ? orgBlocks : personalBlocks
+  const appointments = currentOrg ? orgAppointments : supaAppointments
+  const patients = currentOrg ? orgPatients : supaPatients
+  const blocks = currentOrg ? orgBlocks : supaBlocks
 
   const weekDays = getWeekForDate(selectedDate)
   const filteredAppointments = appointments.filter((a) => a.date === selectedDate)
@@ -286,12 +289,42 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     // (hook already updates via setAppointments in updateStatus)
   }
 
-  const handleSendIndicaciones = (appointment: Appointment) => {
-    alert(`Enviando indicaciones por WhatsApp a ${appointment.patientName}...`)
+  const handleRecordar = (appointment: Appointment) => {
+    setRemindersMode(appointment)
   }
 
-  const handleRecordar = (appointment: Appointment) => {
-    alert(`Enviando recordatorio por WhatsApp a ${appointment.patientName}...`)
+  const handleRecordarTodos = () => {
+    setRemindersMode('day')
+  }
+
+  const handleReasignar = (appointment: Appointment) => {
+    openModalForPatientFromAppointment(appointment, 'reasignar')
+  }
+
+  const handleScheduleFromPatient = (appointment: Appointment) => {
+    openModalForPatientFromAppointment(appointment, 'schedule-for-patient')
+  }
+
+  const openModalForPatientFromAppointment = (
+    appointment: Appointment,
+    intent: 'reasignar' | 'schedule-for-patient',
+  ) => {
+    const match = supaPatients.find((p) => p.name === appointment.patientName)
+    const patient: Patient = match ?? {
+      name: appointment.patientName ?? 'Paciente',
+      phone: '',
+      email: '',
+      age: '',
+      since: '',
+      insurance: 'Particular',
+      lastVisit: '',
+      totalSessions: 0,
+      tags: [],
+      history: [],
+    }
+    setReasignarFor(patient)
+    setModalIntent(intent)
+    setShowNewAppointment(true)
   }
 
   const isOrgAdmin = currentOrg ? memberships[currentOrg.id] === 'admin' : false
@@ -299,11 +332,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const currentPlan = (profile?.plan || 'free') as PlanId
 
   const handleNavigate = (view: View) => {
-    // Paywall: bot config requires Pro
-    if (view === 'config' && !canUseBot(currentPlan)) {
+    // Paywall: estadísticas require Pro (hidden gem, real upsell)
+    if (view === 'estadisticas' && !PLANS[currentPlan].limits.stats) {
       setPaywall({
-        title: 'Activá el bot de WhatsApp',
-        description: 'El bot automatiza turnos, recordatorios y consultas por WhatsApp. Disponible en el plan Pro.',
+        title: 'Estadísticas completas',
+        description: 'Ocupación del mes, turnos por día, obras sociales más frecuentes y más. Disponible desde el plan Pro.',
         requiredPlan: 'pro',
       })
       return
@@ -418,19 +451,40 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       {activeView === 'agenda' && (
         <>
           <div className="flex-1 flex flex-col h-screen overflow-hidden bg-bg">
-            <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10">
+            <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10 scrollbar-hide">
               <PageHeader
                 title="Agenda."
                 subtitle={<span className="capitalize">{heroSubtitle} · {filteredAppointments.length} {filteredAppointments.length === 1 ? 'turno programado' : 'turnos programados'}</span>}
                 right={
                   <>
+                    <div className="inline-flex items-stretch h-[34px] bg-surface border border-gray-border-2 rounded-[8px] overflow-hidden">
+                      {(['week', 'month'] as const).map((mode, i) => {
+                        const active = agendaMode === mode
+                        return (
+                          <button
+                            key={mode}
+                            onClick={() => {
+                              if (mode === 'month' && agendaMode === 'week') handleToggleAgendaMode()
+                              else if (mode === 'week' && agendaMode === 'month') handleToggleAgendaMode()
+                            }}
+                            className={`px-4 text-[12px] font-medium cursor-pointer transition-colors ${
+                              i === 0 ? 'border-r border-gray-border-2' : ''
+                            } ${
+                              active
+                                ? 'bg-primary text-surface'
+                                : 'bg-surface text-text-muted hover:bg-surface-2'
+                            }`}
+                          >
+                            {mode === 'week' ? 'Semana' : 'Mes'}
+                          </button>
+                        )
+                      })}
+                    </div>
                     <Btn
-                      variant={agendaMode === 'month' ? 'primary' : 'secondary'}
-                      onClick={handleToggleAgendaMode}
+                      variant="primary"
+                      onClick={() => { setModalIntent('new'); setShowNewAppointment(true) }}
+                      style={{ height: 34 }}
                     >
-                      <Icon name="cal2" size={13} /> {agendaMode === 'week' ? 'Mes' : 'Semana'}
-                    </Btn>
-                    <Btn variant="primary">
                       <Icon name="plus" size={13} /> Nuevo turno
                     </Btn>
                   </>
@@ -498,9 +552,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     selectedId={selectedId}
                     onSelect={handleSelect}
                     onCancel={handleCancel}
-                    onSendIndicaciones={handleSendIndicaciones}
                     onRecordar={handleRecordar}
+                    onReasignar={handleReasignar}
                     dayLabel={dayLabel}
+                    locations={locations}
                   />
 
                   {isSelectedDateBlocked && filteredAppointments.length === 0 && (
@@ -533,6 +588,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
             blockReason={blockForSelectedDate?.reason}
             onUnblock={handleUnblockDate}
             onBlockHours={handleBlockHours}
+            onRecordarTodos={handleRecordarTodos}
+            onScheduleAppointment={handleScheduleFromPatient}
           />
         </>
       )}
@@ -541,10 +598,57 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         <>
           <PatientsView
             patients={patients}
+            patientRows={supaPatientRows}
             onSelectPatient={setSelectedPatient}
             selectedPatient={selectedPatient}
+            patientLimit={currentOrg ? null : PLANS[currentPlan].limits.patients}
+            onRemovePatient={currentOrg ? undefined : async (id) => {
+              const removedName = supaPatientRows.find((r) => r.id === id)?.name
+              if (removedName && selectedPatient?.name === removedName) {
+                setSelectedPatient(null)
+              }
+              return removePatient(id)
+            }}
+            onImportPatients={currentOrg ? undefined : async (rows) => {
+              const errors: string[] = []
+              let imported = 0
+              const limit = PLANS[currentPlan].limits.patients
+              let slotsLeft = limit === null ? Infinity : Math.max(0, limit - supaPatients.length)
+
+              for (const r of rows) {
+                if (slotsLeft <= 0) {
+                  errors.push(`${r.name}: excede límite del plan`)
+                  continue
+                }
+                const err = await addPatient({
+                  name: r.name,
+                  phone: r.phone || '',
+                  email: r.email || '',
+                  age: r.age || '',
+                  since: new Date().toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }),
+                  insurance: r.insurance || 'Particular',
+                  last_visit: '',
+                  total_sessions: 0,
+                  tags: [],
+                })
+                if (err) {
+                  errors.push(`${r.name}: ${err.message}`)
+                } else {
+                  imported++
+                  if (slotsLeft !== Infinity) slotsLeft--
+                }
+              }
+              return { imported, errors }
+            }}
           />
-          <PatientDetailPanel patient={selectedPatient} />
+          <PatientDetailPanel
+            patient={selectedPatient}
+            onScheduleAppointment={(p) => {
+              setReasignarFor(p)
+              setModalIntent('schedule-for-patient')
+              setShowNewAppointment(true)
+            }}
+          />
         </>
       )}
 
@@ -558,10 +662,6 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
 
       {activeView === 'estadisticas' && (
         <StatsView appointments={appointments} patients={patients} />
-      )}
-
-      {activeView === 'config' && (
-        <BotConfigView />
       )}
 
       {activeView === 'perfil' && (
@@ -583,7 +683,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       )}
 
       {showPlans && userId && (
-        <div className="fixed inset-0 bg-white z-50 flex flex-col">
+        <div className="fixed inset-0 bg-bg z-50 overflow-auto">
           <PlansView
             currentPlan={currentPlan}
             userId={userId}
@@ -606,6 +706,86 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
           }}
         />
       )}
+
+      <NewAppointmentModal
+        open={showNewAppointment}
+        onClose={() => {
+          setShowNewAppointment(false)
+          setReasignarFor(null)
+          setModalIntent('new')
+        }}
+        patients={supaPatients}
+        patientRows={supaPatientRows}
+        appointments={appointments}
+        locations={locations}
+        defaultDate={selectedDate}
+        defaultDuration={profile?.session_duration ?? 50}
+        prefilledPatient={reasignarFor}
+        title={
+          modalIntent === 'reasignar'
+            ? 'Reasignar turno'
+            : modalIntent === 'schedule-for-patient'
+              ? 'Agendar turno'
+              : 'Nuevo turno'
+        }
+        onCreateAppointment={async (input) =>
+          addAppointment({
+            patient_id: input.patient_id,
+            patient_name: input.patient_name,
+            location_id: input.location_id,
+            date: input.date,
+            time: input.time,
+            duration: input.duration,
+            detail: input.detail,
+            status: input.status,
+          })
+        }
+        onCreatePatient={async (name, insurance) => {
+          // Paywall: free plan limited to 10 patients
+          if (!canAddPatient(currentPlan, supaPatients.length)) {
+            setShowNewAppointment(false)
+            setPaywall({
+              title: 'Llegaste al límite de tu plan',
+              description: `El plan Free permite hasta ${PLANS.free.limits.patients} pacientes. Para registrar más, pasate a Pro.`,
+              requiredPlan: 'pro',
+            })
+            return null
+          }
+          const err = await addPatient({
+            name,
+            insurance,
+            phone: '',
+            email: '',
+            age: '',
+            since: new Date().toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }),
+            last_visit: '',
+            total_sessions: 0,
+            tags: [],
+          })
+          if (err) return null
+          // After add, the list refetches. We need to find the created patient row:
+          // do a lightweight direct query.
+          const { data } = await supabase
+            .from('patients')
+            .select('id')
+            .eq('doctor_id', userId ?? '')
+            .eq('name', name)
+            .order('id', { ascending: false })
+            .limit(1)
+            .single()
+          return data ? { id: data.id } : null
+        }}
+      />
+
+      <RemindersModal
+        open={remindersMode !== null}
+        onClose={() => setRemindersMode(null)}
+        appointments={remindersMode && remindersMode !== 'day' ? [remindersMode] : filteredAppointments}
+        dayLabel={currentDay?.label ?? dayLabel}
+        date={selectedDate}
+        doctorShortName={profile ? `Dr${profile.specialty?.toLowerCase().includes('a') ? 'a' : '.'} ${profile.last_name}` : undefined}
+        locations={locations}
+      />
 
       <MobileNav activeView={activeView} onNavigate={handleNavigate} />
     </div>

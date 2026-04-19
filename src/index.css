@@ -67,6 +67,17 @@ body {
 }
 ::-webkit-scrollbar-track { background: transparent; }
 
+/* Utility: hide scrollbar but keep scroll */
+.scrollbar-hide {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* IE/Edge legacy */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;                  /* Chrome/Safari */
+  width: 0;
+  height: 0;
+}
+
 input:focus, textarea:focus, select:focus {
   outline: none;
 }

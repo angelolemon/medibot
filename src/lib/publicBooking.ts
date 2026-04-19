@@ -49,7 +49,28 @@ function toLocalISO(d: Date): string {
   return `${year}-${month}-${day}`
 }
 
-export async function getAvailableSlotsRange(doctorId: string, daysAhead = 14): Promise<DaySlots[]> {
+export interface PublicLocation {
+  id: string
+  name: string
+  address: string
+  city: string
+  work_days: string[]
+  work_from: string | null
+  work_to: string | null
+  is_primary: boolean
+}
+
+export async function getPublicDoctorLocations(doctorId: string): Promise<PublicLocation[]> {
+  const { data } = await supabase
+    .from('locations')
+    .select('id, name, address, city, work_days, work_from, work_to, is_primary')
+    .eq('doctor_id', doctorId)
+    .order('is_primary', { ascending: false })
+    .order('created_at')
+  return (data as PublicLocation[]) || []
+}
+
+export async function getAvailableSlotsRange(doctorId: string, daysAhead = 14, locationId?: string | null): Promise<DaySlots[]> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const fromISO = toLocalISO(today)
@@ -57,7 +78,7 @@ export async function getAvailableSlotsRange(doctorId: string, daysAhead = 14): 
   endDate.setDate(endDate.getDate() + daysAhead)
   const toISO = toLocalISO(endDate)
 
-  // Get doctor config
+  // Get doctor config (session duration fallback)
   const { data: profile } = await supabase
     .from('profiles')
     .select('work_days, work_from, work_to, session_duration')
@@ -65,13 +86,33 @@ export async function getAvailableSlotsRange(doctorId: string, daysAhead = 14): 
     .single()
   if (!profile) return []
 
-  // Get booked appointments
-  const { data: appointments } = await supabase
+  // Get the location to use (the specified one, or the primary)
+  let locationConfig: { work_days: string[]; work_from: string | null; work_to: string | null } = {
+    work_days: profile.work_days || ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'],
+    work_from: profile.work_from,
+    work_to: profile.work_to,
+  }
+  if (locationId) {
+    const { data: loc } = await supabase
+      .from('locations')
+      .select('work_days, work_from, work_to')
+      .eq('id', locationId)
+      .single()
+    if (loc) locationConfig = loc
+  }
+
+  // Get booked appointments for this doctor.
+  // If location filter is active, only count appointments FOR THAT LOCATION — so two
+  // offices on the same date-time don't conflict (doctor can only be at one at a time,
+  // but for booking purposes we treat each as its own calendar).
+  let apptQuery = supabase
     .from('appointments')
-    .select('date, time, status')
+    .select('date, time, status, location_id')
     .eq('doctor_id', doctorId)
     .gte('date', fromISO)
     .lte('date', toISO)
+  if (locationId) apptQuery = apptQuery.eq('location_id', locationId)
+  const { data: appointments } = await apptQuery
 
   // Get date blocks
   const { data: blocks } = await supabase
@@ -96,10 +137,10 @@ export async function getAvailableSlotsRange(doctorId: string, daysAhead = 14): 
     bookedByDate[key].add(String(a.time).slice(0, 5))
   }
 
-  const workDays = profile.work_days || ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
+  const workDays = locationConfig.work_days || ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
   const duration = profile.session_duration || 50
-  const [startH, startM] = String(profile.work_from || '09:00').slice(0, 5).split(':').map(Number)
-  const [endH, endM] = String(profile.work_to || '18:00').slice(0, 5).split(':').map(Number)
+  const [startH, startM] = String(locationConfig.work_from || '09:00').slice(0, 5).split(':').map(Number)
+  const [endH, endM] = String(locationConfig.work_to || '18:00').slice(0, 5).split(':').map(Number)
   const startMin = startH * 60 + startM
   const endMin = endH * 60 + endM
 
@@ -140,6 +181,7 @@ export async function getAvailableSlotsRange(doctorId: string, daysAhead = 14): 
 
 export interface BookingRequest {
   doctorId: string
+  locationId?: string | null
   date: string
   time: string
   duration: string
@@ -163,6 +205,27 @@ export async function createBooking(req: BookingRequest): Promise<{ success: boo
   let patientId = existingPatient?.id
 
   if (!patientId) {
+    // Enforce plan limit before creating a new patient.
+    // Free plan = 10 patients max. Pro/Clinic have null (unlimited).
+    const { data: doctor } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', req.doctorId)
+      .single()
+    const plan = (doctor?.plan || 'free') as 'free' | 'pro' | 'clinic'
+    if (plan === 'free') {
+      const { count } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true })
+        .eq('doctor_id', req.doctorId)
+      if ((count ?? 0) >= 10) {
+        return {
+          success: false,
+          error: 'El profesional alcanzó el límite de pacientes de su plan. Contactalo por otro medio para reservar.',
+        }
+      }
+    }
+
     const { data: newPatient, error: patientErr } = await supabase
       .from('patients')
       .insert({
@@ -189,6 +252,7 @@ export async function createBooking(req: BookingRequest): Promise<{ success: boo
     .insert({
       doctor_id: req.doctorId,
       patient_id: patientId,
+      location_id: req.locationId || null,
       date: req.date,
       time: req.time,
       duration: req.duration,

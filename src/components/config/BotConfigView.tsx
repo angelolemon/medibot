@@ -8,7 +8,7 @@ interface TemplateConfig {
   trigger: string
   triggerLabel: string
   defaultMessage: string
-  category: 'turnos' | 'recordatorios' | 'respuestas'
+  category: 'turnos' | 'respuestas'
 }
 
 const templateConfigs: TemplateConfig[] = [
@@ -62,20 +62,6 @@ const templateConfigs: TemplateConfig[] = [
     category: 'turnos',
   },
   {
-    key: 'reminder_24h',
-    trigger: '24 horas antes del turno',
-    triggerLabel: 'Recordatorio 24hs',
-    defaultMessage: 'Hola {nombre}, te recordamos que mañana tenés turno a las {hora}.\n\nRespondé *"confirmo"* para confirmar o *"cancelar"* si no podés asistir.',
-    category: 'recordatorios',
-  },
-  {
-    key: 'reminder_2h',
-    trigger: '2 horas antes del turno',
-    triggerLabel: 'Recordatorio 2hs',
-    defaultMessage: 'Hola {nombre}, en 2 horas tenés tu sesión con {doctor}. ¡Te esperamos!',
-    category: 'recordatorios',
-  },
-  {
     key: 'talk_to_doctor',
     trigger: 'Cuando pide hablar con el profesional',
     triggerLabel: 'Derivar a profesional',
@@ -100,13 +86,11 @@ const templateConfigs: TemplateConfig[] = [
 
 const categoryLabels: Record<string, string> = {
   turnos: 'Gestión de turnos',
-  recordatorios: 'Recordatorios automáticos',
   respuestas: 'Respuestas del bot',
 }
 
 const categoryIcons: Record<string, string> = {
   turnos: '📅',
-  recordatorios: '🔔',
   respuestas: '🤖',
 }
 
@@ -168,12 +152,12 @@ export default function BotConfigView() {
     }
   }
 
-  const categories = ['turnos', 'recordatorios', 'respuestas'] as const
+  const categories = ['turnos', 'respuestas'] as const
   const [activeTab, setActiveTab] = useState<typeof categories[number]>('turnos')
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg">
-      <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10">
+      <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10 scrollbar-hide">
         <PageHeader
           title={
             <>
@@ -183,8 +167,18 @@ export default function BotConfigView() {
               </span>
             </>
           }
-          subtitle="Los pacientes reservan, confirman y cancelan por WhatsApp. Personalizá las plantillas."
+          subtitle="Atención automática 24/7 cuando los pacientes escriben por WhatsApp. Personalizá las respuestas."
         />
+
+        {/* Context: what the bot is (incoming) vs. reminders (outgoing) */}
+        <div className="bg-primary-light border border-primary-mid rounded-[14px] p-4 mb-6 flex items-start gap-3">
+          <div className="text-[16px]" style={{ fontFamily: 'var(--font-serif)' }}>📥</div>
+          <div className="text-[12px] text-text-muted leading-[1.55]">
+            <strong className="text-text">El bot responde cuando el paciente te escribe.</strong>{' '}
+            Si querés enviar recordatorios salientes a tus pacientes,
+            usá el botón <strong className="text-primary">Recordar a todos</strong> en la agenda — se abre WhatsApp desde tu número.
+          </div>
+        </div>
 
         {/* Tabs — serif italic underline style */}
         <div className="flex gap-6 border-b border-gray-border mb-6">

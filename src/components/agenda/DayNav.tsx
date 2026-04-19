@@ -49,7 +49,7 @@ export default function DayNav({ days, selectedDate, blockedDates, onSelect, onP
               onClick={() => onSelect(d.date)}
               className={`text-left px-3.5 py-3 rounded-[10px] cursor-pointer border transition-colors ${
                 isSelected
-                  ? 'bg-text text-surface border-text'
+                  ? 'bg-primary text-surface border-primary'
                   : isBlocked
                     ? 'bg-coral-light border-coral-light text-coral'
                     : d.isToday

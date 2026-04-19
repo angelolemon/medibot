@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import AuthShell from './AuthShell'
+import Icon from '../Icon'
 
 interface Props {
   onRegisterSuccess: () => void
@@ -8,18 +10,17 @@ interface Props {
 
 export default function RegisterView({ onRegisterSuccess, onGoToLogin }: Props) {
   const [step, setStep] = useState<'form' | 'verify'>('form')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
+    const trimmedName = name.trim()
+    if (!trimmedName || !email || !password) {
       setError('Completá todos los campos')
       return
     }
@@ -27,14 +28,14 @@ export default function RegisterView({ onRegisterSuccess, onGoToLogin }: Props) 
       setError('Ingresá un email válido')
       return
     }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres')
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres')
       return
     }
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden')
-      return
-    }
+
+    // Split the full name into first + last for the profile
+    const [firstName, ...rest] = trimmedName.split(' ')
+    const lastName = rest.join(' ') || ''
 
     setLoading(true)
     const { error } = await supabase.auth.signUp({
@@ -53,89 +54,152 @@ export default function RegisterView({ onRegisterSuccess, onGoToLogin }: Props) 
     setStep('verify')
   }
 
-  return (
-    <div className="min-h-screen bg-gray-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-[400px]">
-        <div className="text-center mb-8">
-          <div className="text-2xl font-semibold text-primary mb-1">MediBot</div>
-          <div className="text-sm text-text-hint">Panel profesional</div>
+  const handleGoogle = async () => {
+    setError('')
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    })
+    if (error) setError(error.message)
+  }
+
+  if (step === 'verify') {
+    return (
+      <AuthShell>
+        <div className="mb-7">
+          <div className="w-12 h-12 rounded-full bg-primary-light text-primary grid place-items-center mb-4">
+            <Icon name="email" size={20} />
+          </div>
+          <h1
+            className="text-[32px] font-normal tracking-[-0.028em] text-text m-0 leading-[1.1]"
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
+            Verificá tu email.
+          </h1>
+          <p className="text-[13px] text-text-muted mt-2 leading-[1.6]">
+            Enviamos un link de verificación a <strong className="text-text">{email}</strong>.
+            Revisá tu bandeja (y spam), hacé clic en el link, y volvé acá.
+          </p>
         </div>
 
-        {step === 'form' ? (
-          <>
-            <div className="bg-white border border-gray-border rounded-[10px] p-6">
-              <div className="text-lg font-semibold mb-1">Crear cuenta</div>
-              <div className="text-sm text-text-muted mb-6">Registrate para acceder al panel</div>
+        <button
+          type="button"
+          onClick={onGoToLogin}
+          className="w-full py-[12px] rounded-[10px] text-[14px] font-medium cursor-pointer bg-primary text-surface hover:bg-[#2F3C2D] transition-colors"
+        >
+          Ir a iniciar sesión
+        </button>
+        <button
+          type="button"
+          onClick={() => setStep('form')}
+          className="w-full py-[12px] mt-2 rounded-[10px] text-[13px] font-medium cursor-pointer bg-surface border border-gray-border-2 text-text-muted hover:bg-surface-2 transition-colors"
+        >
+          Volver al formulario
+        </button>
 
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div>
-                    <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Nombre</label>
-                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Laura" className="w-full px-3 py-2.5 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid" />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Apellido</label>
-                    <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Pérez" className="w-full px-3 py-2.5 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid" />
-                  </div>
-                </div>
+        <div
+          className="mt-8 pt-5 border-t border-gray-border text-[11px] text-text-hint uppercase tracking-[0.12em]"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          no te llegó nada? <a className="text-primary cursor-pointer ml-1 normal-case tracking-normal">reenviar email</a>
+        </div>
+      </AuthShell>
+    )
+  }
 
-                <div className="mb-4">
-                  <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Email</label>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" className="w-full px-3 py-2.5 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid" />
-                </div>
-
-                <div className="mb-4">
-                  <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Contraseña</label>
-                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" className="w-full px-3 py-2.5 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid" />
-                </div>
-
-                <div className="mb-4">
-                  <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Confirmar contraseña</label>
-                  <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repetí tu contraseña" className="w-full px-3 py-2.5 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid" />
-                </div>
-
-                {error && (
-                  <div className="text-xs text-coral mb-4 bg-coral-light rounded-md px-3 py-2">{error}</div>
-                )}
-
-                <button type="submit" disabled={loading} className="w-full py-2.5 rounded-md text-sm font-medium cursor-pointer border border-primary bg-primary text-white hover:bg-[#534AB7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
-                  {loading ? 'Creando cuenta...' : 'Crear cuenta'}
-                </button>
-              </form>
-            </div>
-
-            <div className="text-center mt-4">
-              <span className="text-sm text-text-muted">¿Ya tenés cuenta? </span>
-              <button onClick={onGoToLogin} className="text-sm text-primary font-medium cursor-pointer hover:underline bg-transparent border-none">
-                Iniciar sesión
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="bg-white border border-gray-border rounded-[10px] p-6 text-center">
-            <div className="text-4xl mb-4">📧</div>
-            <div className="text-lg font-semibold mb-2">Verificá tu email</div>
-            <div className="text-sm text-text-muted mb-2">Enviamos un link de verificación a:</div>
-            <div className="text-sm font-medium text-primary mb-6">{email}</div>
-            <div className="text-xs text-text-hint mb-6">
-              Revisá tu bandeja de entrada (y spam) y hacé clic en el link para activar tu cuenta. Luego volvé acá e iniciá sesión.
-            </div>
-
-            <button
-              onClick={onGoToLogin}
-              className="w-full py-2.5 rounded-md text-sm font-medium cursor-pointer border border-primary bg-primary text-white hover:bg-[#534AB7] transition-colors mb-3"
-            >
-              Ir a iniciar sesión
-            </button>
-            <button
-              onClick={() => setStep('form')}
-              className="w-full py-2.5 rounded-md text-sm cursor-pointer border border-gray-border bg-white text-text-muted hover:bg-gray-bg transition-colors"
-            >
-              Volver al formulario
-            </button>
-          </div>
-        )}
+  return (
+    <AuthShell>
+      <div className="mb-7">
+        <h1
+          className="text-[36px] font-normal tracking-[-0.028em] text-text m-0 leading-[1.1]"
+          style={{ fontFamily: 'var(--font-serif)' }}
+        >
+          Creá tu cuenta.
+        </h1>
+        <p className="text-[13px] text-text-muted mt-2">Gratis hasta 10 pacientes · sin tarjeta.</p>
       </div>
-    </div>
+
+      <button
+        type="button"
+        onClick={handleGoogle}
+        className="w-full px-3.5 py-[11px] rounded-[10px] border border-gray-border-2 bg-surface text-[13px] font-medium text-text flex items-center justify-center gap-2.5 cursor-pointer hover:bg-surface-2 transition-colors"
+      >
+        <svg width="16" height="16" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2a10 10 0 0 0-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92a8.8 8.8 0 0 0 2.68-6.61z"/><path fill="#34A853" d="M9 18a8.58 8.58 0 0 0 5.96-2.18l-2.92-2.26a5.44 5.44 0 0 1-8.07-2.85H.92v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.71A5.4 5.4 0 0 1 3.68 9a5.4 5.4 0 0 1 .29-1.71V4.96H.92a9 9 0 0 0 0 8.08l3.05-2.33z"/><path fill="#EA4335" d="M9 3.58a4.9 4.9 0 0 1 3.46 1.35l2.58-2.58A8.64 8.64 0 0 0 9 0 9 9 0 0 0 .92 4.96l3.05 2.33A5.36 5.36 0 0 1 9 3.58z"/></svg>
+        Continuar con Google
+      </button>
+
+      <div
+        className="flex items-center gap-3 my-5 text-text-hint text-[11px] uppercase tracking-[0.12em]"
+        style={{ fontFamily: 'var(--font-mono)' }}
+      >
+        <div className="flex-1 h-px bg-gray-border" />
+        <span>o con email</span>
+        <div className="flex-1 h-px bg-gray-border" />
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label className="text-[12px] text-text-muted font-medium mb-1.5 block">Nombre y apellido</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Alejandra Carrizo"
+            className="w-full px-3.5 py-[11px] rounded-[10px] border border-gray-border-2 bg-surface text-[14px] text-text focus:border-primary-mid"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="text-[12px] text-text-muted font-medium mb-1.5 block">Email profesional</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="dra.carrizo@medibot.ar"
+            className="w-full px-3.5 py-[11px] rounded-[10px] border border-gray-border-2 bg-surface text-[14px] text-text focus:border-primary-mid"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="text-[12px] text-text-muted font-medium mb-1.5 block">Contraseña</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Mínimo 8 caracteres"
+            className="w-full px-3.5 py-[11px] rounded-[10px] border border-gray-border-2 bg-surface text-[14px] text-text focus:border-primary-mid"
+          />
+        </div>
+
+        <div className="text-[11px] text-text-hint leading-[1.6] mb-4">
+          Al continuar aceptás los{' '}
+          <a className="text-primary cursor-pointer">términos</a> y la{' '}
+          <a className="text-primary cursor-pointer">política de privacidad</a>.
+        </div>
+
+        {error && (
+          <div className="text-[12px] text-coral mb-4 bg-coral-light rounded-[8px] px-3 py-2">{error}</div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-[12px] rounded-[10px] text-[14px] font-medium cursor-pointer bg-primary text-surface hover:bg-[#2F3C2D] disabled:opacity-60 transition-colors"
+        >
+          {loading ? 'Creando…' : 'Crear cuenta gratis'}
+        </button>
+      </form>
+
+      <div className="text-[12px] text-text-muted mt-6 text-center">
+        ¿Ya tenés cuenta?{' '}
+        <button
+          type="button"
+          onClick={onGoToLogin}
+          className="text-primary font-medium cursor-pointer bg-transparent border-none hover:underline"
+        >
+          Iniciá sesión
+        </button>
+      </div>
+    </AuthShell>
   )
 }

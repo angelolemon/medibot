@@ -1,16 +1,21 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 
-interface ProfileData {
-  specialty: string
-  license: string
-  phone: string
-  bio: string
+interface LocationInput {
+  name: string
   address: string
   city: string
   workDays: string[]
   workFrom: string
   workTo: string
+}
+
+interface ProfileData {
+  specialty: string
+  license: string
+  phone: string
+  bio: string
+  locations: LocationInput[]
   sessionDuration: string
   priceParticular: string
   bankAlias: string
@@ -25,11 +30,19 @@ interface Props {
 const allDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
 const steps = [
-  { label: 'Bienvenida', icon: '👋' },
   { label: 'Profesional', icon: '🩺' },
-  { label: 'Consultorio', icon: '🏥' },
+  { label: 'Consultorios', icon: '🏥' },
   { label: 'Facturación', icon: '💳' },
 ]
+
+const emptyLocation = (): LocationInput => ({
+  name: 'Consultorio principal',
+  address: '',
+  city: '',
+  workDays: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'],
+  workFrom: '09:00',
+  workTo: '18:00',
+})
 
 export default function OnboardingWizard({ firstName, lastName, onComplete }: Props) {
   const [step, setStep] = useState(0)
@@ -38,46 +51,74 @@ export default function OnboardingWizard({ firstName, lastName, onComplete }: Pr
     license: '',
     phone: '',
     bio: '',
-    address: '',
-    city: '',
-    workDays: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'],
-    workFrom: '09:00',
-    workTo: '18:00',
+    locations: [emptyLocation()],
     sessionDuration: '50',
     priceParticular: '',
     bankAlias: '',
   })
   const [error, setError] = useState('')
 
-  const update = (field: keyof ProfileData, value: string) => {
+  const updateLocation = (index: number, patch: Partial<LocationInput>) => {
+    setData((prev) => ({
+      ...prev,
+      locations: prev.locations.map((l, i) => i === index ? { ...l, ...patch } : l),
+    }))
+    setError('')
+  }
+
+  const addLocation = () => {
+    setData((prev) => ({
+      ...prev,
+      locations: [...prev.locations, { ...emptyLocation(), name: `Consultorio ${prev.locations.length + 1}` }],
+    }))
+  }
+
+  const removeLocation = (index: number) => {
+    setData((prev) => ({
+      ...prev,
+      locations: prev.locations.filter((_, i) => i !== index),
+    }))
+  }
+
+  const toggleLocationDay = (index: number, day: string) => {
+    setData((prev) => ({
+      ...prev,
+      locations: prev.locations.map((l, i) => {
+        if (i !== index) return l
+        return {
+          ...l,
+          workDays: l.workDays.includes(day) ? l.workDays.filter((d) => d !== day) : [...l.workDays, day],
+        }
+      }),
+    }))
+  }
+
+  const update = (field: keyof Omit<ProfileData, 'locations'>, value: string) => {
     setData((prev) => ({ ...prev, [field]: value }))
     setError('')
   }
 
-  const toggleDay = (day: string) => {
-    setData((prev) => ({
-      ...prev,
-      workDays: prev.workDays.includes(day)
-        ? prev.workDays.filter((d) => d !== day)
-        : [...prev.workDays, day],
-    }))
-  }
-
   const validateStep = (): boolean => {
-    if (step === 1) {
+    if (step === 0) {
       if (!data.specialty || !data.license) {
         setError('Completá especialidad y matrícula')
         return false
       }
     }
-    if (step === 2) {
-      if (!data.address || !data.city) {
-        setError('Completá dirección y ciudad')
+    if (step === 1) {
+      if (data.locations.length === 0) {
+        setError('Agregá al menos un consultorio')
         return false
       }
-      if (data.workDays.length === 0) {
-        setError('Seleccioná al menos un día de atención')
-        return false
+      for (const [i, loc] of data.locations.entries()) {
+        if (!loc.address || !loc.city) {
+          setError(`Completá dirección y ciudad del consultorio ${i + 1}`)
+          return false
+        }
+        if (loc.workDays.length === 0) {
+          setError(`Seleccioná al menos un día de atención en ${loc.name || `consultorio ${i + 1}`}`)
+          return false
+        }
       }
     }
     return true
@@ -94,26 +135,60 @@ export default function OnboardingWizard({ firstName, lastName, onComplete }: Pr
       setSaving(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const { error } = await supabase.from('profiles').update({
+        const primary = data.locations[0]
+        // Save profile core + keep legacy address/schedule fields mirroring the primary location
+        const { error: profileErr } = await supabase.from('profiles').update({
           specialty: data.specialty,
           license: data.license,
           phone: data.phone,
           bio: data.bio,
-          address: data.address,
-          city: data.city,
-          work_days: data.workDays,
-          work_from: data.workFrom,
-          work_to: data.workTo,
+          address: primary.address,
+          city: primary.city,
+          work_days: primary.workDays,
+          work_from: primary.workFrom,
+          work_to: primary.workTo,
           session_duration: parseInt(data.sessionDuration) || 50,
           price_particular: parseInt(data.priceParticular) || 0,
           bank_alias: data.bankAlias,
           needs_onboarding: false,
         }).eq('id', user.id)
-        setSaving(false)
-        if (error) {
-          setError('Error al guardar: ' + error.message)
+
+        if (profileErr) {
+          setSaving(false)
+          setError('Error al guardar: ' + profileErr.message)
           return
         }
+
+        // Only create locations if the user doesn't have any yet.
+        // If they're re-doing the onboarding (needs_onboarding=true again), we skip
+        // so we don't cascade-null the location_id of existing appointments.
+        const { data: existingLocs } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('doctor_id', user.id)
+          .limit(1)
+
+        if (!existingLocs || existingLocs.length === 0) {
+          const { error: locErr } = await supabase.from('locations').insert(
+            data.locations.map((loc, i) => ({
+              doctor_id: user.id,
+              name: loc.name || `Consultorio ${i + 1}`,
+              address: loc.address,
+              city: loc.city,
+              work_days: loc.workDays,
+              work_from: loc.workFrom,
+              work_to: loc.workTo,
+              is_primary: i === 0,
+            })),
+          )
+          if (locErr) {
+            setSaving(false)
+            setError('Error al guardar consultorios: ' + locErr.message)
+            return
+          }
+        }
+
+        setSaving(false)
       }
       onComplete(data)
     }
@@ -166,38 +241,20 @@ export default function OnboardingWizard({ firstName, lastName, onComplete }: Pr
         <div className="w-full max-w-[520px]">
           <div className="bg-white border border-gray-border rounded-[10px] p-6 sm:p-8">
 
-            {/* Step 0: Welcome */}
+            {/* Step 0: Greeting + Professional data (merged) */}
             {step === 0 && (
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-primary-light flex items-center justify-center text-xl font-semibold text-primary mx-auto mb-4">
-                  {initials}
-                </div>
-                <div className="text-xl font-semibold mb-2">Hola, {firstName}!</div>
-                <div className="text-sm text-text-muted mb-6 max-w-[360px] mx-auto">
-                  Vamos a configurar tu perfil profesional para que puedas empezar a usar MediBot. Solo toma unos minutos.
-                </div>
-                <div className="grid grid-cols-3 gap-3 mb-6 max-w-[340px] mx-auto">
-                  <div className="bg-gray-bg rounded-lg p-3 text-center">
-                    <div className="text-lg mb-1">📅</div>
-                    <div className="text-[10px] text-text-hint">Agenda inteligente</div>
-                  </div>
-                  <div className="bg-gray-bg rounded-lg p-3 text-center">
-                    <div className="text-lg mb-1">🤖</div>
-                    <div className="text-[10px] text-text-hint">Bot de WhatsApp</div>
-                  </div>
-                  <div className="bg-gray-bg rounded-lg p-3 text-center">
-                    <div className="text-lg mb-1">📊</div>
-                    <div className="text-[10px] text-text-hint">Estadísticas</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 1: Professional data */}
-            {step === 1 && (
               <div>
-                <div className="text-lg font-semibold mb-1">Datos profesionales</div>
-                <div className="text-sm text-text-muted mb-6">Contanos sobre tu práctica</div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-full bg-primary-light flex items-center justify-center text-[16px] font-semibold text-primary shrink-0">
+                    {initials}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-lg font-semibold leading-tight">Hola, {firstName}.</div>
+                    <div className="text-xs text-text-muted mt-0.5">Configurá tu perfil en 3 pasos cortos.</div>
+                  </div>
+                </div>
+
+                <div className="text-sm font-medium text-text mb-4">Datos profesionales</div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <FormField label="Especialidad *" value={data.specialty} placeholder="Ej: Psicóloga" onChange={(v) => update('specialty', v)} />
@@ -212,75 +269,130 @@ export default function OnboardingWizard({ firstName, lastName, onComplete }: Pr
                     value={data.bio}
                     onChange={(e) => update('bio', e.target.value)}
                     rows={3}
-                    placeholder="Contá brevemente tu especialización y enfoque terapéutico..."
+                    placeholder="Contá brevemente tu especialización y enfoque..."
                     className="w-full px-3 py-2.5 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid resize-none"
                   />
-                  <div className="text-[10px] text-text-hint mt-1">Se muestra a pacientes nuevos que contactan por WhatsApp</div>
+                  <div className="text-[10px] text-text-hint mt-1">Se muestra a pacientes nuevos en tu link público.</div>
                 </div>
               </div>
             )}
 
-            {/* Step 2: Office & schedule */}
-            {step === 2 && (
+            {/* Step 1: Consultorios (multi-location) */}
+            {step === 1 && (
               <div>
-                <div className="text-lg font-semibold mb-1">Consultorio y horarios</div>
-                <div className="text-sm text-text-muted mb-6">Configurá tu lugar y horario de atención</div>
-
-                <div className="mb-4">
-                  <FormField label="Dirección *" value={data.address} placeholder="Av. Santa Fe 2340, Piso 5" onChange={(v) => update('address', v)} />
-                </div>
-                <div className="mb-4">
-                  <FormField label="Ciudad *" value={data.city} placeholder="CABA, Buenos Aires" onChange={(v) => update('city', v)} />
+                <div className="text-lg font-semibold mb-1">Consultorios y horarios</div>
+                <div className="text-sm text-text-muted mb-5">
+                  Agregá todos los lugares donde atendés. Cada uno tiene sus propios días y horarios.
                 </div>
 
-                <div className="mb-4">
-                  <label className="text-[11px] text-text-hint uppercase tracking-wide mb-2 block">Días de atención *</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {allDays.map((day) => (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => toggleDay(day)}
-                        className={`px-3 py-1.5 rounded-full text-xs border cursor-pointer transition-colors ${
-                          data.workDays.includes(day)
-                            ? 'bg-primary text-white border-primary'
-                            : 'bg-white text-text-hint border-gray-border hover:bg-gray-bg'
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex flex-col gap-4">
+                  {data.locations.map((loc, i) => (
+                    <div key={i} className="bg-gray-bg border border-gray-border rounded-[12px] p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="text"
+                          value={loc.name}
+                          onChange={(e) => updateLocation(i, { name: e.target.value })}
+                          placeholder={`Consultorio ${i + 1}`}
+                          className="flex-1 px-3 py-2 rounded-md border border-gray-border bg-white text-sm font-medium focus:outline-none focus:border-primary-mid"
+                        />
+                        {i === 0 && (
+                          <span className="text-[10px] px-2 py-1 rounded-full bg-primary-light text-primary font-semibold uppercase tracking-wider">
+                            Principal
+                          </span>
+                        )}
+                        {data.locations.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeLocation(i)}
+                            className="w-8 h-8 rounded-full hover:bg-coral-light text-text-hint hover:text-coral grid place-items-center cursor-pointer"
+                            title="Eliminar consultorio"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <FormField
+                          label="Dirección *"
+                          value={loc.address}
+                          placeholder="Av. Santa Fe 2340"
+                          onChange={(v) => updateLocation(i, { address: v })}
+                        />
+                        <FormField
+                          label="Ciudad *"
+                          value={loc.city}
+                          placeholder="CABA"
+                          onChange={(v) => updateLocation(i, { city: v })}
+                        />
+                      </div>
+
+                      <div className="mb-3">
+                        <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1.5 block">Días de atención *</label>
+                        <div className="flex flex-wrap gap-1">
+                          {allDays.map((day) => (
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={() => toggleLocationDay(i, day)}
+                              className={`px-2.5 py-1 rounded-full text-[11px] border cursor-pointer transition-colors ${
+                                loc.workDays.includes(day)
+                                  ? 'bg-primary text-white border-primary'
+                                  : 'bg-white text-text-hint border-gray-border hover:bg-gray-bg'
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Desde</label>
+                          <input
+                            type="time"
+                            value={loc.workFrom}
+                            onChange={(e) => updateLocation(i, { workFrom: e.target.value })}
+                            className="w-full px-3 py-2 rounded-md border border-gray-border bg-white text-sm focus:outline-none focus:border-primary-mid"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Hasta</label>
+                          <input
+                            type="time"
+                            value={loc.workTo}
+                            onChange={(e) => updateLocation(i, { workTo: e.target.value })}
+                            className="w-full px-3 py-2 rounded-md border border-gray-border bg-white text-sm focus:outline-none focus:border-primary-mid"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={addLocation}
+                    className="w-full py-2.5 rounded-[12px] border-2 border-dashed border-gray-border text-text-muted text-sm cursor-pointer hover:border-primary-mid hover:text-primary transition-colors"
+                  >
+                    + Agregar otro consultorio
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Desde</label>
-                    <input
-                      type="time"
-                      value={data.workFrom}
-                      onChange={(e) => update('workFrom', e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-text-hint uppercase tracking-wide mb-1 block">Hasta</label>
-                    <input
-                      type="time"
-                      value={data.workTo}
-                      onChange={(e) => update('workTo', e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid"
-                    />
-                  </div>
-                  <div>
-                    <FormField label="Duración (min)" value={data.sessionDuration} placeholder="50" onChange={(v) => update('sessionDuration', v)} />
-                  </div>
+                <div className="mt-5">
+                  <FormField
+                    label="Duración de sesión (min)"
+                    value={data.sessionDuration}
+                    placeholder="50"
+                    onChange={(v) => update('sessionDuration', v)}
+                  />
                 </div>
               </div>
             )}
 
-            {/* Step 3: Billing */}
-            {step === 3 && (
+            {/* Step 2: Billing */}
+            {step === 2 && (
               <div>
                 <div className="text-lg font-semibold mb-1">Facturación</div>
                 <div className="text-sm text-text-muted mb-6">Datos de cobro para pacientes particulares</div>
@@ -330,7 +442,7 @@ export default function OnboardingWizard({ firstName, lastName, onComplete }: Pr
                 disabled={saving}
                 className="px-6 py-2.5 rounded-md text-sm font-medium cursor-pointer border border-primary bg-primary text-white hover:bg-[#534AB7] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {saving ? 'Guardando...' : step === 0 ? 'Empezar' : step === steps.length - 1 ? 'Completar perfil' : 'Siguiente'}
+                {saving ? 'Guardando...' : step === steps.length - 1 ? 'Completar perfil' : 'Siguiente'}
               </button>
             </div>
           </div>

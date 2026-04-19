@@ -1,4 +1,6 @@
 import type { Appointment } from '../../data/appointments'
+import type { LocationRow } from '../../lib/hooks'
+import { resolveLocationForDate } from '../../lib/locationResolver'
 import Icon from '../Icon'
 import Btn from '../Btn'
 
@@ -31,8 +33,9 @@ interface Props {
   isSelected: boolean
   onSelect: (appointment: Appointment) => void
   onCancel: (id: string) => void
-  onSendIndicaciones: (appointment: Appointment) => void
   onRecordar: (appointment: Appointment) => void
+  onReasignar?: (appointment: Appointment) => void
+  locations?: LocationRow[]
 }
 
 export default function AppointmentCard({
@@ -40,12 +43,30 @@ export default function AppointmentCard({
   isSelected,
   onSelect,
   onCancel,
-  onSendIndicaciones,
   onRecordar,
+  onReasignar,
+  locations,
 }: Props) {
   const isLibre = appointment.status === 'libre'
   const isBloqueado = appointment.status === 'bloqueado'
   const isInactive = isLibre || isBloqueado
+
+  // Resolve effective location (explicit FK, then day-of-week inference)
+  const effectiveLocation =
+    locations && locations.length > 0
+      ? resolveLocationForDate(appointment.locationId, appointment.date, locations)
+      : null
+  const displayLocationName = effectiveLocation?.name ?? appointment.locationName
+
+  // Compare the appointment's end time to "now"
+  const isPast = (() => {
+    if (!appointment.date || !appointment.time) return false
+    const [h, m] = appointment.time.split(':').map(Number)
+    const durMin = parseInt(appointment.duration) || 50
+    const apt = new Date(appointment.date + 'T00:00:00')
+    apt.setHours(h, m + durMin, 0, 0)
+    return apt.getTime() < Date.now()
+  })()
 
   return (
     <div
@@ -87,6 +108,11 @@ export default function AppointmentCard({
               {appointment.doctorLabel}
             </span>
           )}
+          {displayLocationName && !isLibre && !isBloqueado && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-text-hint" style={{ fontFamily: 'var(--font-mono)' }}>
+              <Icon name="building" size={10} /> {displayLocationName}
+            </span>
+          )}
           {!isLibre && !isBloqueado && appointment.detail && <span>{appointment.detail}</span>}
           <span className={`inline-block text-[11px] font-medium px-[9px] py-[2px] rounded-full ${badgeStyles[appointment.status]}`}>
             {badgeLabel[appointment.status]}
@@ -96,29 +122,32 @@ export default function AppointmentCard({
 
       {/* Actions */}
       <div className={`flex gap-1.5 shrink-0 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} max-lg:opacity-100`}>
-        {appointment.status === 'confirmado' && (
+        {isPast && (appointment.status === 'confirmado' || appointment.status === 'pendiente') ? (
+          <span className="inline-block text-[11px] font-medium px-[9px] py-[2px] rounded-full bg-surface-2 text-text-hint" style={{ fontFamily: 'var(--font-mono)' }}>
+            Turno pasado
+          </span>
+        ) : (
           <>
-            <Btn size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); onSendIndicaciones(appointment) }}>
-              <Icon name="send" size={12} /> Indicaciones
-            </Btn>
-            <Btn size="sm" onClick={(e) => { e.stopPropagation(); onCancel(appointment.id) }}>Cancelar</Btn>
+            {appointment.status === 'confirmado' && (
+              <Btn size="sm" onClick={(e) => { e.stopPropagation(); onCancel(appointment.id) }}>Cancelar</Btn>
+            )}
+            {appointment.status === 'pendiente' && (
+              <>
+                <Btn size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); onRecordar(appointment) }}>
+                  <Icon name="chat" size={12} /> Recordar
+                </Btn>
+                <Btn size="sm" onClick={(e) => { e.stopPropagation(); onCancel(appointment.id) }}>Cancelar</Btn>
+              </>
+            )}
+            {appointment.status === 'cancelado' && onReasignar && (
+              <Btn size="sm" onClick={(e) => { e.stopPropagation(); onReasignar(appointment) }}>
+                <Icon name="plus" size={12} /> Reasignar
+              </Btn>
+            )}
+            {appointment.status === 'libre' && !isPast && (
+              <Btn size="sm" onClick={(e) => e.stopPropagation()}>Bloquear</Btn>
+            )}
           </>
-        )}
-        {appointment.status === 'pendiente' && (
-          <>
-            <Btn size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); onRecordar(appointment) }}>
-              <Icon name="chat" size={12} /> Recordar
-            </Btn>
-            <Btn size="sm" onClick={(e) => { e.stopPropagation(); onCancel(appointment.id) }}>Cancelar</Btn>
-          </>
-        )}
-        {appointment.status === 'cancelado' && (
-          <Btn size="sm" onClick={(e) => e.stopPropagation()}>
-            <Icon name="plus" size={12} /> Reasignar
-          </Btn>
-        )}
-        {appointment.status === 'libre' && (
-          <Btn size="sm" onClick={(e) => e.stopPropagation()}>Bloquear</Btn>
         )}
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Organization } from '../../lib/hooks'
-import { canUseBot, type PlanId } from '../../lib/plans'
+import { PLANS, type PlanId } from '../../lib/plans'
 import Icon from '../Icon'
 
 export type View = 'agenda' | 'pacientes' | 'bloqueos' | 'estadisticas' | 'config' | 'perfil' | 'organizacion'
@@ -10,7 +10,6 @@ const navItems: { icon: string; label: string; view: View }[] = [
   { icon: 'users',    label: 'Pacientes', view: 'pacientes' },
   { icon: 'block',    label: 'Bloqueos', view: 'bloqueos' },
   { icon: 'chart',    label: 'Estadísticas', view: 'estadisticas' },
-  { icon: 'chat',     label: 'WhatsApp Bot', view: 'config' },
 ]
 
 interface Props {
@@ -29,7 +28,7 @@ interface Props {
 }
 
 export default function Sidebar({ activeView, onNavigate, agendaBadge, onLogout, doctorName, doctorSub, organizations, currentOrg, isOrgAdmin, onSwitchOrg, onCreateOrg, currentPlan }: Props) {
-  const showBotLock = currentPlan ? !canUseBot(currentPlan) : false
+  const showStatsLock = currentPlan ? !PLANS[currentPlan].limits.stats : false
   const [orgOpen, setOrgOpen] = useState(false)
   const orgRef = useRef<HTMLDivElement>(null)
 
@@ -135,7 +134,7 @@ export default function Sidebar({ activeView, onNavigate, agendaBadge, onLogout,
                   {agendaBadge}
                 </span>
               )}
-              {item.view === 'config' && showBotLock && (
+              {item.view === 'estadisticas' && showStatsLock && (
                 <span className="bg-primary text-surface text-[9px] font-semibold uppercase tracking-wider px-1.5 py-px rounded-full">
                   Pro
                 </span>

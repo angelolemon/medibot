@@ -113,8 +113,8 @@ export default function MonthCalendar({ appointments, blockedDates, currentMonth
                   ? 'opacity-40 border-transparent'
                   : isSelected
                     ? isBlocked
-                      ? 'border-coral bg-coral-light ring-1 ring-coral'
-                      : 'border-primary bg-primary-light ring-1 ring-primary'
+                      ? 'border-coral bg-coral text-surface'
+                      : 'border-primary bg-primary text-surface'
                     : isBlocked
                       ? 'border-coral/20 bg-coral-light/50 hover:bg-coral-light'
                       : 'border-gray-border bg-white hover:bg-gray-bg'
@@ -122,7 +122,7 @@ export default function MonthCalendar({ appointments, blockedDates, currentMonth
             >
               <div className="flex items-center gap-1 mb-1">
                 <span className={`text-xs font-medium ${
-                  isSelected ? (isBlocked ? 'text-coral' : 'text-primary') : isBlocked ? 'text-coral' : 'text-text'
+                  isSelected ? 'text-surface' : isBlocked ? 'text-coral' : 'text-text'
                 }`}>
                   {cell.day}
                 </span>
@@ -136,11 +136,11 @@ export default function MonthCalendar({ appointments, blockedDates, currentMonth
 
               {!isBlocked && total > 0 && cell.isCurrentMonth && (
                 <div className="flex flex-col gap-0.5 mt-auto">
-                  <div className="text-[10px] text-text-muted font-medium">{total} turno{total !== 1 ? 's' : ''}</div>
+                  <div className={`text-[10px] font-medium ${isSelected ? 'text-surface opacity-85' : 'text-text-muted'}`}>{total} turno{total !== 1 ? 's' : ''}</div>
                   <div className="flex gap-0.5">
                     {confirmados > 0 && <div className="w-1.5 h-1.5 rounded-full bg-teal" title={`${confirmados} confirmados`} />}
-                    {pendientes > 0 && <div className="w-1.5 h-1.5 rounded-full bg-[#EF9F27]" title={`${pendientes} pendientes`} />}
-                    {cancelados > 0 && <div className="w-1.5 h-1.5 rounded-full bg-[#E24B4A]" title={`${cancelados} cancelados`} />}
+                    {pendientes > 0 && <div className="w-1.5 h-1.5 rounded-full bg-amber" title={`${pendientes} pendientes`} />}
+                    {cancelados > 0 && <div className="w-1.5 h-1.5 rounded-full bg-coral" title={`${cancelados} cancelados`} />}
                   </div>
                 </div>
               )}

@@ -9,8 +9,6 @@ export interface Plan {
   highlighted?: boolean
   limits: {
     patients: number | null // null = unlimited
-    whatsappEnabled: boolean
-    whatsappMessages: number | null // null = unlimited
     organizationEnabled: boolean
     customBranding: boolean
     stats: boolean
@@ -22,18 +20,17 @@ export const PLANS: Record<PlanId, Plan> = {
     id: 'free',
     name: 'Free',
     price: 0,
-    description: 'Para probar la plataforma',
+    description: 'Para empezar.',
     features: [
       'Hasta 10 pacientes',
       'Agenda web completa',
-      'Página pública de turnos',
+      'Link público de reservas',
+      'Recordatorios manuales por WhatsApp',
       '1 profesional',
       'Soporte por email',
     ],
     limits: {
       patients: 10,
-      whatsappEnabled: false,
-      whatsappMessages: 0,
       organizationEnabled: false,
       customBranding: false,
       stats: false,
@@ -43,21 +40,18 @@ export const PLANS: Record<PlanId, Plan> = {
     id: 'pro',
     name: 'Pro',
     price: 19,
-    description: 'Para profesionales independientes',
+    description: 'Para profesionales independientes.',
     highlighted: true,
     features: [
+      'Todo lo de Free',
       'Pacientes ilimitados',
-      'Bot de WhatsApp con templates',
-      'Hasta 500 mensajes WhatsApp/mes',
-      'Página pública con marca propia',
+      'Marca propia: logo y colores',
+      'Link público con tu identidad',
       'Estadísticas completas',
-      'Logo y colores personalizados',
-      '1 profesional',
+      'Soporte prioritario',
     ],
     limits: {
       patients: null,
-      whatsappEnabled: true,
-      whatsappMessages: 500,
       organizationEnabled: false,
       customBranding: true,
       stats: true,
@@ -67,11 +61,11 @@ export const PLANS: Record<PlanId, Plan> = {
     id: 'clinic',
     name: 'Clinic',
     price: 49,
-    description: 'Para consultorios y clínicas',
+    description: 'Para consultorios y clínicas.',
     features: [
       'Todo lo de Pro',
       'Hasta 10 profesionales',
-      'Mensajes WhatsApp ilimitados',
+      'Agenda centralizada del consultorio',
       'Panel de administración',
       'Invitar y gestionar médicos',
       'Estadísticas por profesional y globales',
@@ -79,8 +73,6 @@ export const PLANS: Record<PlanId, Plan> = {
     ],
     limits: {
       patients: null,
-      whatsappEnabled: true,
-      whatsappMessages: null,
       organizationEnabled: true,
       customBranding: true,
       stats: true,
@@ -97,10 +89,6 @@ export function canAddPatient(planId: PlanId | string | null | undefined, curren
   const plan = getPlan(planId)
   if (plan.limits.patients === null) return true
   return currentCount < plan.limits.patients
-}
-
-export function canUseBot(planId: PlanId | string | null | undefined): boolean {
-  return getPlan(planId).limits.whatsappEnabled
 }
 
 export function canCreateOrg(planId: PlanId | string | null | undefined): boolean {

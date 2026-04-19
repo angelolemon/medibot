@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { getPlan, type PlanId } from '../../lib/plans'
 import PageHeader from '../PageHeader'
 import Btn from '../Btn'
+import LocationsManager from './LocationsManager'
 
 interface DoctorData {
   firstName: string
@@ -129,7 +130,7 @@ export default function DoctorProfileView({ onLogout, onOpenPlans }: Props) {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-bg">
-      <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10">
+      <div className="px-8 sm:px-10 pt-8 pb-10 overflow-y-auto flex-1 pb-20 lg:pb-10 scrollbar-hide">
         <PageHeader
           title="Mi perfil."
           subtitle="Datos profesionales y configuración de consultorio."
@@ -185,67 +186,23 @@ export default function DoctorProfileView({ onLogout, onOpenPlans }: Props) {
             </div>
           </div>
 
-          {/* Location */}
+          {/* Sesión y cobro (unified) */}
           <div className="bg-white border border-gray-border rounded-[10px] p-5">
-            <div className="text-[13px] font-semibold mb-4">Consultorio</div>
-            <div className="space-y-3">
-              <Field label="Dirección" value={data.address} field="address" editing={editing} onChange={updateField} />
-              <Field label="Ciudad" value={data.city} field="city" editing={editing} onChange={updateField} />
-            </div>
-          </div>
-
-          {/* Schedule */}
-          <div className="bg-white border border-gray-border rounded-[10px] p-5">
-            <div className="text-[13px] font-semibold mb-4">Horario de atención</div>
-            <div className="mb-3">
-              <div className="text-[11px] text-text-hint uppercase tracking-wide mb-2">Días de atención</div>
-              <div className="flex flex-wrap gap-1.5">
-                {allDays.map((day) => (
-                  <button
-                    key={day}
-                    onClick={() => editing && toggleDay(day)}
-                    className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
-                      data.workDays.includes(day)
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-white text-text-hint border-gray-border'
-                    } ${editing ? 'cursor-pointer' : 'cursor-default'}`}
-                  >
-                    {day}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <div className="text-[13px] font-semibold mb-4">Sesión y cobro</div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-[11px] text-text-hint uppercase tracking-wide mb-1">Desde</div>
-                {editing ? (
-                  <input type="time" value={data.workFrom} onChange={(e) => updateField('workFrom', e.target.value)} className="w-full px-3 py-2 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid" />
-                ) : (
-                  <div className="text-sm text-text">{data.workFrom} hs</div>
-                )}
-              </div>
-              <div>
-                <div className="text-[11px] text-text-hint uppercase tracking-wide mb-1">Hasta</div>
-                {editing ? (
-                  <input type="time" value={data.workTo} onChange={(e) => updateField('workTo', e.target.value)} className="w-full px-3 py-2 rounded-md border border-gray-border text-sm focus:outline-none focus:border-primary-mid focus:ring-1 focus:ring-primary-mid" />
-                ) : (
-                  <div className="text-sm text-text">{data.workTo} hs</div>
-                )}
+              <Field label="Duración (min)" value={data.sessionDuration} field="sessionDuration" editing={editing} onChange={updateField} />
+              <Field label="Valor particular" value={data.priceParticular} field="priceParticular" editing={editing} onChange={updateField} prefix="$" />
+              <div className="col-span-2">
+                <Field label="Alias de pago" value={data.bankAlias} field="bankAlias" editing={editing} onChange={updateField} />
               </div>
             </div>
-            <div className="mt-3">
-              <Field label="Duración de sesión (min)" value={data.sessionDuration} field="sessionDuration" editing={editing} onChange={updateField} />
+            <div className="text-[11px] text-text-hint mt-3 leading-[1.5]">
+              La duración se aplica por defecto a turnos nuevos, podés sobreescribirla turno por turno.
             </div>
           </div>
 
-          {/* Billing */}
-          <div className="bg-white border border-gray-border rounded-[10px] p-5">
-            <div className="text-[13px] font-semibold mb-4">Facturación</div>
-            <div className="space-y-3">
-              <Field label="Valor sesión particular" value={data.priceParticular} field="priceParticular" editing={editing} onChange={updateField} prefix="$" />
-              <Field label="Alias de pago" value={data.bankAlias} field="bankAlias" editing={editing} onChange={updateField} />
-            </div>
-          </div>
+          {/* Multi-location manager */}
+          {userId && <LocationsManager userId={userId} />}
 
           {/* Booking link */}
           <div className="bg-white border border-gray-border rounded-[10px] p-5 lg:col-span-2">
@@ -255,6 +212,15 @@ export default function DoctorProfileView({ onLogout, onOpenPlans }: Props) {
             </div>
             <div className="text-xs text-text-muted mb-4">Compartí este link con tus pacientes. Pueden ver tu perfil, disponibilidad y sacar turno directamente desde el link, sin registrarse.</div>
             <BookingLink bookingCode={profile?.booking_code || null} />
+          </div>
+
+          {/* Google Calendar / Apple Calendar sync */}
+          <div className="bg-white border border-gray-border rounded-[14px] p-5 md:col-span-2">
+            <div className="text-[13px] font-semibold mb-1">Sincronizar con tu calendario</div>
+            <div className="text-xs text-text-muted mb-4">
+              Ves tus turnos junto con el resto de tus eventos en Google Calendar, Apple Calendar u Outlook. Los cambios que hagas en MediBot se reflejan automáticamente cada pocas horas.
+            </div>
+            <CalendarSync bookingCode={profile?.booking_code || null} />
           </div>
         </div>
       </div>
@@ -323,33 +289,43 @@ function PlanCard({ plan, onOpenPlans }: { plan: PlanId; onOpenPlans?: () => voi
   const isFree = plan === 'free'
 
   return (
-    <div className={`rounded-[10px] p-5 mb-4 ${
-      isFree ? 'bg-white border border-gray-border' : 'bg-gradient-to-br from-primary to-[#534AB7] text-white'
-    }`}>
-      <div className="flex items-center justify-between gap-3">
+    <div
+      className={`rounded-[14px] p-5 mb-4 border ${
+        isFree
+          ? 'bg-surface border-gray-border'
+          : 'bg-primary-light border-primary-mid'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
-          <div className={`text-[11px] uppercase tracking-wide mb-1 ${isFree ? 'text-text-hint' : 'opacity-80'}`}>
+          <div
+            className={`text-[10px] uppercase tracking-[0.12em] mb-1 ${
+              isFree ? 'text-text-hint' : 'text-primary'
+            }`}
+            style={{ fontFamily: 'var(--font-mono)' }}
+          >
             Tu plan actual
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-[18px] font-semibold">{p.name}</span>
+          <div className="flex items-baseline gap-2.5">
+            <span
+              className={`text-[22px] italic tracking-[-0.015em] ${isFree ? 'text-text' : 'text-primary'}`}
+              style={{ fontFamily: 'var(--font-serif)' }}
+            >
+              {p.name}
+            </span>
             {p.price > 0 && (
-              <span className={`text-xs ${isFree ? 'text-text-hint' : 'opacity-80'}`}>
-                ${p.price} USD/mes
+              <span className="text-[12px] text-text-hint" style={{ fontFamily: 'var(--font-mono)' }}>
+                USD {p.price}/mes
               </span>
             )}
           </div>
-          <div className={`text-xs mt-1 ${isFree ? 'text-text-muted' : 'opacity-90'}`}>
+          <div className="text-[12px] text-text-muted mt-1 leading-[1.5]">
             {p.description}
           </div>
         </div>
         <button
           onClick={onOpenPlans}
-          className={`shrink-0 px-3.5 py-2 rounded-md text-xs font-medium cursor-pointer transition-colors ${
-            isFree
-              ? 'bg-primary text-white hover:bg-[#534AB7]'
-              : 'bg-white text-primary hover:bg-gray-bg'
-          }`}
+          className="shrink-0 px-4 py-2 rounded-[8px] text-[12px] font-medium cursor-pointer transition-colors bg-primary text-surface hover:bg-[#2F3C2D] border border-primary"
         >
           {isFree ? 'Mejorar plan' : 'Cambiar plan'}
         </button>
@@ -434,6 +410,76 @@ function Field({ label, value, field, editing, onChange, prefix }: {
       ) : (
         <div className="text-sm text-text">{prefix}{value || '—'}</div>
       )}
+    </div>
+  )
+}
+
+function CalendarSync({ bookingCode }: { bookingCode: string | null }) {
+  const [copied, setCopied] = useState(false)
+  if (!bookingCode) {
+    return (
+      <div className="text-xs text-text-hint bg-gray-bg rounded-md px-3 py-2.5">
+        El código se genera automáticamente. Recargá la página si no aparece.
+      </div>
+    )
+  }
+
+  // Cleaner URL through Vercel proxy → transparently forwards to the Supabase edge fn.
+  // Falls back to the direct Supabase URL when running locally on Vite dev server.
+  const origin = window.location.origin
+  const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1')
+  const icsUrl = isLocal
+    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ics-feed/${bookingCode}.ics`
+    : `${origin}/ics/${bookingCode}.ics`
+  // webcal:// scheme triggers the native "subscribe" flow in macOS / iOS / Outlook
+  const webcalUrl = icsUrl.replace(/^https?:\/\//, 'webcal://')
+  // Google Calendar's "Add via URL" only works reliably when the URL goes through the
+  // Google /calendar/r/addcalendar flow with the webcal:// variant as cid parameter.
+  const googleAddUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(icsUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div>
+      {/* URL */}
+      <div className="bg-gray-bg rounded-lg px-3 py-2.5 flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] text-text-hint uppercase tracking-wide mb-0.5">URL del calendario</div>
+          <div className="text-xs font-mono text-text truncate">{icsUrl}</div>
+        </div>
+        <button
+          onClick={handleCopy}
+          className="px-3 py-1.5 rounded-md text-xs cursor-pointer border border-primary bg-primary text-white hover:bg-[#2F3C2D] transition-colors shrink-0"
+        >
+          {copied ? '¡Copiado!' : 'Copiar'}
+        </button>
+      </div>
+
+      {/* One-click add buttons */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a
+          href={googleAddUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md cursor-pointer border border-gray-border bg-white text-text hover:bg-surface-2 transition-colors"
+        >
+          Agregar a Google Calendar
+        </a>
+        <a
+          href={webcalUrl}
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md cursor-pointer border border-gray-border bg-white text-text hover:bg-surface-2 transition-colors"
+        >
+          Agregar a Apple Calendar
+        </a>
+      </div>
+
+      <div className="mt-4 text-[11px] text-text-hint leading-[1.5]">
+        Es <strong>read-only</strong>: ves tus turnos en el calendario pero no podés editarlos desde ahí. MediBot es la fuente de verdad.
+      </div>
     </div>
   )
 }

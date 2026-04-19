@@ -54,6 +54,10 @@ export interface Appointment {
   status: AppointmentStatus
   patient: Patient | null
   doctorLabel?: string
+  locationId?: string | null
+  locationName?: string | null
+  locationAddress?: string | null
+  locationCity?: string | null
 }
 
 export interface DayOption {

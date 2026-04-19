@@ -1,4 +1,5 @@
 import type { Appointment } from '../../data/appointments'
+import type { LocationRow } from '../../lib/hooks'
 import AppointmentCard from './AppointmentCard'
 
 interface Props {
@@ -6,9 +7,10 @@ interface Props {
   selectedId: string | null
   onSelect: (appointment: Appointment) => void
   onCancel: (id: string) => void
-  onSendIndicaciones: (appointment: Appointment) => void
   onRecordar: (appointment: Appointment) => void
+  onReasignar?: (appointment: Appointment) => void
   dayLabel: string
+  locations?: LocationRow[]
 }
 
 export default function AppointmentList({
@@ -16,9 +18,10 @@ export default function AppointmentList({
   selectedId,
   onSelect,
   onCancel,
-  onSendIndicaciones,
   onRecordar,
+  onReasignar,
   dayLabel,
+  locations,
 }: Props) {
   return (
     <div>
@@ -40,8 +43,9 @@ export default function AppointmentList({
           isSelected={selectedId === apt.id}
           onSelect={onSelect}
           onCancel={onCancel}
-          onSendIndicaciones={onSendIndicaciones}
           onRecordar={onRecordar}
+          onReasignar={onReasignar}
+          locations={locations}
         />
       ))}
     </div>

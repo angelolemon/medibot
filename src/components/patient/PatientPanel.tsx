@@ -12,9 +12,11 @@ interface Props {
   blockReason?: string
   onUnblock?: () => void
   onBlockHours?: (date: string, from: string, to: string) => void
+  onRecordarTodos?: () => void
+  onScheduleAppointment?: (appointment: Appointment) => void
 }
 
-export default function PatientPanel({ appointment, dayAppointments, dayLabel, selectedDate, isBlocked, blockReason, onUnblock, onBlockHours }: Props) {
+export default function PatientPanel({ appointment, dayAppointments, dayLabel, selectedDate, isBlocked, blockReason, onUnblock, onBlockHours, onRecordarTodos, onScheduleAppointment }: Props) {
   const [showBlockForm, setShowBlockForm] = useState(false)
   const [showBlockConfirm, setShowBlockConfirm] = useState(false)
   const [blockFrom, setBlockFrom] = useState('09:00')
@@ -159,12 +161,18 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
         </div>
 
         {/* Footer actions */}
-        <div className="p-4 border-t border-gray-border flex gap-2 shrink-0">
-          <Btn variant="primary" className="flex-1" style={{ flex: 1, justifyContent: 'center' }}>
-            <Icon name="send" size={12} /> Enviar indicaciones
-          </Btn>
-          <Btn>
-            <Icon name="chat" size={13} />
+        <div className="p-4 border-t border-gray-border flex flex-col gap-2 shrink-0">
+          {onScheduleAppointment && (
+            <Btn
+              variant="primary"
+              onClick={() => onScheduleAppointment(appointment)}
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              <Icon name="plus" size={13} /> Agendar turno
+            </Btn>
+          )}
+          <Btn style={{ width: '100%', justifyContent: 'center' }}>
+            <Icon name="chat" size={13} /> Abrir WhatsApp
           </Btn>
         </div>
       </Panel>
@@ -293,13 +301,13 @@ export default function PatientPanel({ appointment, dayAppointments, dayLabel, s
         </div>
       ) : (
         <div className="p-4 border-t border-gray-border shrink-0 flex flex-col gap-2">
-          {total > 0 && (
+          {total > 0 && onRecordarTodos && (
             <Btn
               variant="primary"
-              onClick={() => alert(`Enviando recordatorio a ${pacientes} pacientes...`)}
+              onClick={onRecordarTodos}
               style={{ width: '100%', justifyContent: 'center' }}
             >
-              <Icon name="send" size={13} /> Recordar a todos
+              <Icon name="chat" size={13} /> Recordar a todos
             </Btn>
           )}
 
