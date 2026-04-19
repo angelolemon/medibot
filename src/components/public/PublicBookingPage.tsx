@@ -167,7 +167,7 @@ export default function PublicBookingPage({ bookingCode }: Props) {
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className="h-screen lg:overflow-hidden flex flex-col"
       style={{ background: 'var(--color-bg)', fontFamily: 'var(--font-sans)', color: 'var(--color-text)' }}
     >
       <h1 className="sr-only">
@@ -176,7 +176,7 @@ export default function PublicBookingPage({ bookingCode }: Props) {
       </h1>
 
       {/* Header */}
-      <header className="bg-surface border-b border-gray-border" role="banner">
+      <header className="bg-surface border-b border-gray-border shrink-0" role="banner">
         <div className="px-6 lg:px-10 py-3.5 flex items-center justify-between">
           <div className="flex items-baseline gap-3">
             <a
@@ -453,7 +453,7 @@ export default function PublicBookingPage({ bookingCode }: Props) {
       </main>
 
       <footer
-        className="text-[10px] text-text-hint uppercase tracking-[0.18em] py-4 px-6 lg:px-10 border-t border-gray-border flex items-center justify-between"
+        className="text-[10px] text-text-hint uppercase tracking-[0.18em] py-4 px-6 lg:px-10 border-t border-gray-border flex items-center justify-between shrink-0"
         style={{ fontFamily: 'var(--font-mono)' }}
         role="contentinfo"
       >
