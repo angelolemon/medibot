@@ -44,6 +44,41 @@ export async function startCheckout(planId: Exclude<PlanId, 'free'>): Promise<vo
 }
 
 /**
+ * After MP redirects back with `?preapproval_id=X`, call this to link the
+ * new subscription to the authenticated user. MP's preapproval API does not
+ * expose payer_email reliably, so we rely on this client-initiated handshake
+ * instead of waiting for a webhook.
+ */
+export async function linkSubscription(preapprovalId: string): Promise<{
+  plan: PlanId
+  status: PlanStatus
+  validUntil: string | null
+}> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const jwt = sessionData.session?.access_token
+  if (!jwt) throw new Error('Necesitás iniciar sesión.')
+
+  const res = await fetch(FN_URL('mp-link-subscription'), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ preapprovalId }),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    console.error('mp-link-subscription failed', res.status, body)
+    throw new Error('No pudimos confirmar tu suscripción. Escribinos y lo resolvemos.')
+  }
+  return (await res.json()) as {
+    plan: PlanId
+    status: PlanStatus
+    validUntil: string | null
+  }
+}
+
+/**
  * Cancel the current subscription. Benefits remain until `plan_valid_until`,
  * after which a cron demotes the user to free.
  */

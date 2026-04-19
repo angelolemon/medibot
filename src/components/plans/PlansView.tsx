@@ -4,6 +4,7 @@ import {
   cancelSubscription,
   describeStatus,
   getBillingState,
+  linkSubscription,
   startCheckout,
   type BillingState,
 } from '../../lib/billing'
@@ -24,10 +25,33 @@ export default function PlansView({ currentPlan, userId, onClose }: Props) {
   const [state, setState] = useState<BillingState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [linking, setLinking] = useState(false)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
+      // If MP just redirected the user back with a preapproval_id, link it to
+      // this account before loading billing state. MP appends it to back_url
+      // on successful checkout. We do this client-side because the preapproval
+      // API doesn't return payer_email, so the webhook can't match the sub
+      // to the user on its own.
+      const params = new URLSearchParams(window.location.search)
+      const preId = params.get('preapproval_id')
+      if (preId) {
+        setLinking(true)
+        try {
+          await linkSubscription(preId)
+        } catch (err) {
+          if (alive) setError(err instanceof Error ? err.message : String(err))
+        }
+        // Strip the tracking params so a reload doesn't re-link.
+        const url = new URL(window.location.href)
+        url.searchParams.delete('preapproval_id')
+        url.searchParams.delete('upgrade')
+        window.history.replaceState({}, '', url.toString())
+        if (alive) setLinking(false)
+      }
+
       const s = await getBillingState(userId)
       if (alive) setState(s)
     })()
@@ -162,6 +186,13 @@ export default function PlansView({ currentPlan, userId, onClose }: Props) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {linking && (
+          <div className="max-w-[560px] mx-auto mb-10 text-[13px] text-primary bg-primary-light rounded-[12px] px-4 py-3 flex items-center gap-2.5">
+            <Icon name="check" size={14} stroke={2} />
+            Confirmando tu suscripción con MercadoPago…
           </div>
         )}
 
