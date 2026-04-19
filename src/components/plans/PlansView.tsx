@@ -4,7 +4,7 @@ import {
   cancelSubscription,
   describeStatus,
   getBillingState,
-  linkSubscription,
+  reconcileSubscription,
   startCheckout,
   type BillingState,
 } from '../../lib/billing'
@@ -30,36 +30,33 @@ export default function PlansView({ currentPlan, userId, onClose }: Props) {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      // If MP just redirected the user back with a preapproval_id, link it to
-      // this account before loading billing state. MP appends it to back_url
-      // on successful checkout. We do this client-side because the preapproval
-      // API doesn't return payer_email, so the webhook can't match the sub
-      // to the user on its own.
-      //
-      // Resilience: MP has been observed to glue the param with `?` instead
-      // of `&` when back_url already contains a query string — resulting in
-      // URLs like `/planes?upgrade=success?preapproval_id=X`. Normalize by
-      // regex so this edge case doesn't silently break the link flow.
-      const search = window.location.search
-      const match = search.match(/[?&]preapproval_id=([^&?]+)/)
-      const preId = match?.[1] ?? null
-      if (preId) {
-        setLinking(true)
-        try {
-          await linkSubscription(preId)
-        } catch (err) {
-          if (alive) setError(err instanceof Error ? err.message : String(err))
+      // Always reconcile with MP on mount. This asks the backend "does this
+      // user have a fresh authorized subscription on MP's side that we
+      // haven't linked yet?" — if yes, it links it. No dependency on URL
+      // params, so it survives MP mangling the back_url redirect, the user
+      // closing the tab and returning later, or us losing the preapproval_id
+      // to caching. If the profile is already linked, it's a cheap re-sync.
+      setLinking(true)
+      try {
+        const result = await reconcileSubscription()
+        // Only keep the "confirming" banner up if we actually did something
+        // user-visible. A silent re-sync shouldn't flash UI.
+        if (result.linked !== 'new' && alive) setLinking(false)
+        // Clear any stray query params MP appended on redirect.
+        if (window.location.search) {
+          const url = new URL(window.location.href)
+          url.search = ''
+          window.history.replaceState({}, '', url.toString())
         }
-        // Strip the tracking params so a reload doesn't re-link.
-        const url = new URL(window.location.href)
-        url.searchParams.delete('preapproval_id')
-        url.searchParams.delete('upgrade')
-        window.history.replaceState({}, '', url.toString())
-        if (alive) setLinking(false)
+      } catch (err) {
+        if (alive) setError(err instanceof Error ? err.message : String(err))
       }
 
       const s = await getBillingState(userId)
-      if (alive) setState(s)
+      if (alive) {
+        setState(s)
+        setLinking(false)
+      }
     })()
     return () => {
       alive = false

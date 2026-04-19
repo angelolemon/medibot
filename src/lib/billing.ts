@@ -44,6 +44,48 @@ export async function startCheckout(planId: Exclude<PlanId, 'free'>): Promise<vo
 }
 
 /**
+ * Ask the backend to reconcile the caller with whatever their most recent
+ * authorized subscription is on MP's side. Safe to call any time: if the
+ * profile is already linked, it just re-syncs from MP (idempotent). If not
+ * linked but MP has a fresh authorized sub for us, it links it. Otherwise
+ * it's a no-op.
+ *
+ * Called on every /planes mount so returning from MP checkout Just Works,
+ * even if the back_url redirect mangled the preapproval_id query param.
+ */
+export async function reconcileSubscription(): Promise<{
+  linked: 'new' | 'resync' | false
+  plan?: PlanId
+  status?: PlanStatus
+  validUntil?: string | null
+  note?: string
+}> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const jwt = sessionData.session?.access_token
+  if (!jwt) throw new Error('Necesitás iniciar sesión.')
+
+  const res = await fetch(FN_URL('mp-reconcile'), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      'Content-Type': 'application/json',
+    },
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    console.error('mp-reconcile failed', res.status, body)
+    throw new Error('No pudimos sincronizar con MercadoPago.')
+  }
+  return (await res.json()) as {
+    linked: 'new' | 'resync' | false
+    plan?: PlanId
+    status?: PlanStatus
+    validUntil?: string | null
+    note?: string
+  }
+}
+
+/**
  * After MP redirects back with `?preapproval_id=X`, call this to link the
  * new subscription to the authenticated user. MP's preapproval API does not
  * expose payer_email reliably, so we rely on this client-initiated handshake
