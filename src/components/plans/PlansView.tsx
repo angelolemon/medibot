@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { PLANS, TRIAL_DAYS, formatARS, type PlanId } from '../../lib/plans'
 import {
+  MP_PUBLIC_KEY,
   cancelSubscription,
   describeStatus,
   getBillingState,
-  reconcileSubscription,
-  startCheckout,
   type BillingState,
 } from '../../lib/billing'
+import { supabase } from '../../lib/supabase'
 import Icon from '../Icon'
 import Btn from '../Btn'
+import CheckoutModal from './CheckoutModal'
 
 interface Props {
   currentPlan: PlanId
@@ -21,78 +22,61 @@ interface Props {
 const PLAN_ORDER: PlanId[] = ['free', 'pro', 'clinic']
 
 export default function PlansView({ currentPlan, userId, onClose }: Props) {
-  const [saving, setSaving] = useState<PlanId | null>(null)
   const [state, setState] = useState<BillingState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
-  const [linking, setLinking] = useState(false)
+  const [checkoutPlan, setCheckoutPlan] = useState<Exclude<PlanId, 'free'> | null>(null)
+  const [email, setEmail] = useState<string>('')
 
   useEffect(() => {
     let alive = true
     ;(async () => {
-      // Always reconcile with MP on mount. This asks the backend "does this
-      // user have a fresh authorized subscription on MP's side that we
-      // haven't linked yet?" — if yes, it links it. No dependency on URL
-      // params, so it survives MP mangling the back_url redirect, the user
-      // closing the tab and returning later, or us losing the preapproval_id
-      // to caching. If the profile is already linked, it's a cheap re-sync.
-      setLinking(true)
-      try {
-        const result = await reconcileSubscription()
-        // Only keep the "confirming" banner up if we actually did something
-        // user-visible. A silent re-sync shouldn't flash UI.
-        if (result.linked !== 'new' && alive) setLinking(false)
-        // Clear any stray query params MP appended on redirect.
-        if (window.location.search) {
-          const url = new URL(window.location.href)
-          url.search = ''
-          window.history.replaceState({}, '', url.toString())
-        }
-      } catch (err) {
-        if (alive) setError(err instanceof Error ? err.message : String(err))
-      }
-
-      const s = await getBillingState(userId)
-      if (alive) {
-        setState(s)
-        setLinking(false)
-      }
+      const [{ data: userData }, s] = await Promise.all([
+        supabase.auth.getUser(),
+        getBillingState(userId),
+      ])
+      if (!alive) return
+      setEmail(userData.user?.email ?? '')
+      setState(s)
     })()
     return () => {
       alive = false
     }
   }, [userId])
 
-  const handleChoose = async (planId: PlanId) => {
+  const refreshState = async () => {
+    const s = await getBillingState(userId)
+    setState(s)
+  }
+
+  const handleChoose = (planId: PlanId) => {
     if (planId === currentPlan) return
     setError(null)
 
-    // Free: no checkout, just flip the plan locally. (We only allow this path
-    // from an admin UI; for end users, downgrade happens via cancel.)
     if (planId === 'free') {
       setError('Para volver a Free cancelá tu plan actual desde el resumen.')
       return
     }
-
-    try {
-      setSaving(planId)
-      await startCheckout(planId)
-      // The tab navigates to MercadoPago; on success MP redirects back with
-      // ?upgrade=success, at which point the user comes back to this view.
-    } catch (err) {
-      setSaving(null)
-      setError(err instanceof Error ? err.message : String(err))
+    if (!MP_PUBLIC_KEY) {
+      setError('MercadoPago no está configurado (falta VITE_MP_PUBLIC_KEY). Contactá al equipo.')
+      return
     }
+
+    setCheckoutPlan(planId as Exclude<PlanId, 'free'>)
   }
 
   const handleCancel = async () => {
-    if (!confirm('¿Seguro que querés cancelar? Seguís con los beneficios hasta la próxima fecha de cobro.')) return
+    if (
+      !confirm(
+        '¿Seguro que querés cancelar? Seguís con los beneficios hasta la próxima fecha de cobro.',
+      )
+    )
+      return
     setError(null)
     setCancelling(true)
     try {
       await cancelSubscription()
-      const fresh = await getBillingState(userId)
-      setState(fresh)
+      await refreshState()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -192,13 +176,6 @@ export default function PlansView({ currentPlan, userId, onClose }: Props) {
           </div>
         )}
 
-        {linking && (
-          <div className="max-w-[560px] mx-auto mb-10 text-[13px] text-primary bg-primary-light rounded-[12px] px-4 py-3 flex items-center gap-2.5">
-            <Icon name="check" size={14} stroke={2} />
-            Confirmando tu suscripción con MercadoPago…
-          </div>
-        )}
-
         {error && (
           <div className="max-w-[560px] mx-auto mb-10 text-[13px] text-coral bg-coral-light rounded-[12px] px-4 py-3">
             {error}
@@ -276,7 +253,7 @@ export default function PlansView({ currentPlan, userId, onClose }: Props) {
 
                 <button
                   onClick={() => handleChoose(id)}
-                  disabled={isCurrent || saving === id || plan.price === 0}
+                  disabled={isCurrent || plan.price === 0}
                   className={`w-full py-[11px] rounded-[10px] text-[13px] font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 transition-colors mb-5 inline-flex items-center justify-center gap-2 ${
                     isCurrent
                       ? isHighlighted
@@ -287,9 +264,7 @@ export default function PlansView({ currentPlan, userId, onClose }: Props) {
                         : 'bg-primary text-surface hover:bg-[#2F3C2D]'
                   }`}
                 >
-                  {saving === id ? (
-                    'Redirigiendo…'
-                  ) : isCurrent ? (
+                  {isCurrent ? (
                     'Plan actual'
                   ) : plan.price === 0 ? (
                     'Se activa al cancelar'
@@ -390,6 +365,19 @@ export default function PlansView({ currentPlan, userId, onClose }: Props) {
           cobro automático vía MercadoPago · factura al email · cancelás cuando quieras
         </div>
       </div>
+
+      {checkoutPlan && email && (
+        <CheckoutModal
+          planId={checkoutPlan}
+          publicKey={MP_PUBLIC_KEY}
+          payerEmail={email}
+          onSuccess={async () => {
+            setCheckoutPlan(null)
+            await refreshState()
+          }}
+          onClose={() => setCheckoutPlan(null)}
+        />
+      )}
     </div>
   )
 }

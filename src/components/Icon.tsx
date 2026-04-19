@@ -32,6 +32,8 @@ const ICONS: Record<string, string> = {
   trash:    'M5 6h10M8 6V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2M6 6v10a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V6',
   external: 'M13 3h4v4M17 3l-8 8M9 5H5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-4',
   arrowR:   'M4 10h12M12 6l4 4-4 4',
+  lock:     'M6 9V6a4 4 0 0 1 8 0v3M4 9h12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9zM10 12v2',
+  alert:    'M10 3l8 14H2L10 3zM10 8v4M10 14v.5',
 }
 
 interface Props {

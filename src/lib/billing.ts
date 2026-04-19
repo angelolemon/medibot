@@ -1,24 +1,54 @@
-// Billing client — MercadoPago flow.
+// Billing client — MercadoPago Card Payment Brick flow.
 //
-// The client hits our Supabase Edge Functions (`mp-create-subscription` and
-// `mp-cancel-subscription`) which do the server-side work with the MP
-// access token. MP then redirects the user through checkout and fires a
-// webhook back to `mp-webhook` that reconciles our DB.
+// Flow:
+//   1. User clicks "Probar 14 días" → CheckoutModal mounts MP's Card Payment
+//      Brick, which collects card data and tokenizes it client-side. Card
+//      data never touches our server.
+//   2. The Brick's onSubmit gives us { token, payer.email }. We POST those
+//      to /api/mp-create-subscription along with the planId + our Supabase JWT.
+//   3. The server calls MP's POST /preapproval with card_token_id +
+//      preapproval_plan_id + external_reference = user_id. MP returns the
+//      authorized preapproval; we write the link into profiles in the same
+//      request, then return the final plan state.
+//   4. Every future webhook event for this sub carries external_reference,
+//      so we match back to the user trivially.
+//
+// There is no redirect flow, no URL parsing, no reconciliation heuristics.
 
 import { supabase } from './supabase'
 import type { PlanId } from './plans'
 
-// Billing endpoints run as Vercel serverless functions (co-located with the
-// frontend). Keeping the prefix simple so everything is on the same origin —
-// no CORS preflight, no Supabase gateway quirks.
 const FN_URL = (name: string) => `/api/${name}`
 
+// MP public key for the SDK (safe to expose — this is the client-side key
+// from MP Dashboard → Credenciales de producción → Public Key).
+export const MP_PUBLIC_KEY = (import.meta.env.VITE_MP_PUBLIC_KEY ?? '').trim()
+
+export type PlanStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired'
+
+export interface BillingState {
+  plan: PlanId
+  status: PlanStatus
+  validUntil: string | null
+  trialEndsAt: string | null
+  preapprovalId: string | null
+}
+
 /**
- * Start the upgrade flow for a plan. Redirects the browser to MercadoPago,
- * where the doctor authorizes the card. Returns (and never resolves) on
- * success; throws on error.
+ * Create a subscription with a card token obtained from MP's Card Payment
+ * Brick. The server does the heavy lifting (POST /preapproval with our
+ * external_reference) and returns the final plan state.
  */
-export async function startCheckout(planId: Exclude<PlanId, 'free'>): Promise<void> {
+export async function createSubscription(input: {
+  planId: Exclude<PlanId, 'free'>
+  cardToken: string
+  payerEmail: string
+}): Promise<{
+  plan: PlanId
+  status: PlanStatus
+  validUntil: string | null
+  preapprovalId: string
+}> {
   const { data: sessionData } = await supabase.auth.getSession()
   const jwt = sessionData.session?.access_token
   if (!jwt) throw new Error('Necesitás iniciar sesión.')
@@ -29,94 +59,25 @@ export async function startCheckout(planId: Exclude<PlanId, 'free'>): Promise<vo
       Authorization: `Bearer ${jwt}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ planId }),
+    body: JSON.stringify(input),
   })
 
   if (!res.ok) {
-    const body = await res.text()
-    console.error('mp-create-subscription failed', res.status, body)
-    throw new Error('No pudimos iniciar el pago. Probá de nuevo en un minuto.')
+    let msg = 'No pudimos crear la suscripción.'
+    try {
+      const parsed = (await res.json()) as { message?: string; error?: string }
+      msg = parsed.message || parsed.error || msg
+    } catch {
+      /* keep default */
+    }
+    throw new Error(msg)
   }
 
-  const { init_point: initPoint } = (await res.json()) as { init_point: string }
-  // Top-level redirect: MP's checkout does not work inside a modal iframe.
-  window.location.href = initPoint
-}
-
-/**
- * Ask the backend to reconcile the caller with whatever their most recent
- * authorized subscription is on MP's side. Safe to call any time: if the
- * profile is already linked, it just re-syncs from MP (idempotent). If not
- * linked but MP has a fresh authorized sub for us, it links it. Otherwise
- * it's a no-op.
- *
- * Called on every /planes mount so returning from MP checkout Just Works,
- * even if the back_url redirect mangled the preapproval_id query param.
- */
-export async function reconcileSubscription(): Promise<{
-  linked: 'new' | 'resync' | false
-  plan?: PlanId
-  status?: PlanStatus
-  validUntil?: string | null
-  note?: string
-}> {
-  const { data: sessionData } = await supabase.auth.getSession()
-  const jwt = sessionData.session?.access_token
-  if (!jwt) throw new Error('Necesitás iniciar sesión.')
-
-  const res = await fetch(FN_URL('mp-reconcile'), {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-  })
-  if (!res.ok) {
-    const body = await res.text()
-    console.error('mp-reconcile failed', res.status, body)
-    throw new Error('No pudimos sincronizar con MercadoPago.')
-  }
-  return (await res.json()) as {
-    linked: 'new' | 'resync' | false
-    plan?: PlanId
-    status?: PlanStatus
-    validUntil?: string | null
-    note?: string
-  }
-}
-
-/**
- * After MP redirects back with `?preapproval_id=X`, call this to link the
- * new subscription to the authenticated user. MP's preapproval API does not
- * expose payer_email reliably, so we rely on this client-initiated handshake
- * instead of waiting for a webhook.
- */
-export async function linkSubscription(preapprovalId: string): Promise<{
-  plan: PlanId
-  status: PlanStatus
-  validUntil: string | null
-}> {
-  const { data: sessionData } = await supabase.auth.getSession()
-  const jwt = sessionData.session?.access_token
-  if (!jwt) throw new Error('Necesitás iniciar sesión.')
-
-  const res = await fetch(FN_URL('mp-link-subscription'), {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ preapprovalId }),
-  })
-  if (!res.ok) {
-    const body = await res.text()
-    console.error('mp-link-subscription failed', res.status, body)
-    throw new Error('No pudimos confirmar tu suscripción. Escribinos y lo resolvemos.')
-  }
   return (await res.json()) as {
     plan: PlanId
     status: PlanStatus
     validUntil: string | null
+    preapprovalId: string
   }
 }
 
@@ -144,16 +105,6 @@ export async function cancelSubscription(): Promise<void> {
 // ────────────────────────────────────────────────────────────────
 // Helpers for billing state displayed in the UI.
 // ────────────────────────────────────────────────────────────────
-
-export type PlanStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired'
-
-export interface BillingState {
-  plan: PlanId
-  status: PlanStatus
-  validUntil: string | null
-  trialEndsAt: string | null
-  preapprovalId: string | null
-}
 
 export async function getBillingState(userId: string): Promise<BillingState | null> {
   const { data } = await supabase

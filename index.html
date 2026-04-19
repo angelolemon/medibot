@@ -85,6 +85,9 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- MercadoPago JS SDK. Loaded on every page so /planes can open the
+         Card Payment Brick without a round-trip delay. ~30kB gzipped. -->
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
