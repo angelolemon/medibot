@@ -791,9 +791,9 @@ function RightRail({
       : 'se selecciona al elegir fecha'
 
   return (
-    <aside className="bg-surface border-l border-gray-border p-[26px] overflow-y-auto scrollbar-hide flex flex-col">
-      {/* Office selector */}
-      <div>
+    <aside className="bg-surface border-l border-gray-border flex flex-col min-h-0">
+      {/* Top: office selector (no scroll) */}
+      <div className="px-[26px] pt-[28px] shrink-0">
         <div
           className="flex justify-between items-baseline mb-[10px]"
           style={{ fontFamily: 'var(--font-mono)' }}
@@ -852,12 +852,45 @@ function RightRail({
             )
           })}
         </div>
+        <div className="h-px bg-gray-border mt-5" />
       </div>
 
-      <div className="h-px bg-gray-border my-5" />
+      {/* Middle: scrollable empty state or horarios */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-[26px] py-5">
+        {!currentDay ? (
+          <EmptyDayState />
+        ) : (
+          <DaySlotsPanel
+            currentDay={currentDay}
+            selectedTime={selectedTime}
+            onPickSlot={onPickSlot}
+          />
+        )}
+      </div>
 
-      {/* Empty state or horarios */}
-      {!currentDay ? <EmptyDayState /> : <DaySlotsPanel currentDay={currentDay} selectedTime={selectedTime} onPickSlot={onPickSlot} onConfirm={onConfirm} />}
+      {/* Bottom: confirm button — always visible */}
+      <div className="px-[26px] pb-[26px] pt-4 border-t border-gray-border shrink-0 bg-surface">
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={!selectedTime}
+          className="w-full py-[13px] rounded-[10px] text-[14px] font-medium cursor-pointer bg-primary text-surface hover:bg-[#2F3C2D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+        >
+          {selectedTime ? (
+            <>
+              <span>Continuar con</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
+                {selectedTime}
+              </span>
+              <span>→</span>
+            </>
+          ) : !currentDay ? (
+            'Elegí un día'
+          ) : (
+            'Elegí un horario'
+          )}
+        </button>
+      </div>
     </aside>
   )
 }
@@ -885,12 +918,10 @@ function DaySlotsPanel({
   currentDay,
   selectedTime,
   onPickSlot,
-  onConfirm,
 }: {
   currentDay: DaySlotsGrouped
   selectedTime: string | null
   onPickSlot: (t: string) => void
-  onConfirm: () => void
 }) {
   const d = new Date(currentDay.date + 'T12:00:00')
   const dayNamesShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -905,7 +936,7 @@ function DaySlotsPanel({
   const afternoon = currentDay.slots.filter((s) => parseInt(s.split(':')[0], 10) >= 13)
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div>
       <div
         className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1"
         style={{ fontFamily: 'var(--font-mono)' }}
@@ -919,35 +950,12 @@ function DaySlotsPanel({
         <span className="italic">{dow}</span> {short}
       </div>
 
-      <div className="flex-1 mt-4">
-        {morning.length > 0 && (
-          <SlotBlock title="Mañana" slots={morning} selectedTime={selectedTime} onPick={onPickSlot} />
-        )}
-        {afternoon.length > 0 && (
-          <SlotBlock title="Tarde" slots={afternoon} selectedTime={selectedTime} onPick={onPickSlot} last />
-        )}
-      </div>
-
-      <div className="mt-[18px] pt-4 border-t border-gray-border">
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={!selectedTime}
-          className="w-full py-[13px] rounded-[10px] text-[14px] font-medium cursor-pointer bg-primary text-surface hover:bg-[#2F3C2D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-        >
-          {selectedTime ? (
-            <>
-              <span>Continuar con</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
-                {selectedTime}
-              </span>
-              <span>→</span>
-            </>
-          ) : (
-            'Elegí un horario'
-          )}
-        </button>
-      </div>
+      {morning.length > 0 && (
+        <SlotBlock title="Mañana" slots={morning} selectedTime={selectedTime} onPick={onPickSlot} />
+      )}
+      {afternoon.length > 0 && (
+        <SlotBlock title="Tarde" slots={afternoon} selectedTime={selectedTime} onPick={onPickSlot} last />
+      )}
     </div>
   )
 }
