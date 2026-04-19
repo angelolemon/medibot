@@ -45,10 +45,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!jwt) return res.status(401).json({ error: 'missing_auth' })
 
   let userId: string | null = null
+  let userEmail: string | null = null
   try {
     const { data, error } = await admin().auth.getUser(jwt)
     if (error || !data.user) throw error ?? new Error('no user')
     userId = data.user.id
+    userEmail = data.user.email ?? null
   } catch (err) {
     console.error('auth failed', err)
     return res.status(401).json({ error: 'invalid_auth' })
@@ -64,10 +66,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const mpPlanId = planId === 'clinic' ? MP_PLAN_ID_CLINIC : MP_PLAN_ID_PRO
   if (!mpPlanId) return res.status(500).json({ error: 'plan_not_configured' })
 
-  // Redirect flow: append external_reference so MP fires webhook with our user id.
+  // Redirect flow: don't send external_reference — the "suscripción con plan"
+  // checkout rejects extra query params with SUB03. Instead, we match the user
+  // on webhook by payer_email (MP gives us the email the payer used to check
+  // out) against profiles.email. payer_email hint can be pre-filled so the
+  // user doesn't have to retype.
   const initPoint = new URL('https://www.mercadopago.com.ar/subscriptions/checkout')
   initPoint.searchParams.set('preapproval_plan_id', mpPlanId)
-  initPoint.searchParams.set('external_reference', userId!)
+  if (userEmail) initPoint.searchParams.set('payer_email', userEmail)
 
   // Audit log
   try {

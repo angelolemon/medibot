@@ -120,9 +120,25 @@ async function handlePreapproval(preapprovalId: string) {
   const pre = await mpGet<MPPreapproval>(`/preapproval/${preapprovalId}`)
   if (!pre) return
 
-  const userId = pre.external_reference
+  // Resolve our user. Preferred path: external_reference (set when we POST
+  // create the preapproval directly). Fallback: payer_email against profiles —
+  // used by the "suscripción con plan" redirect flow, which rejects
+  // external_reference as a query param.
+  let userId: string | null = pre.external_reference || null
+  if (!userId && pre.payer_email) {
+    // Case-insensitive match: Supabase stores whatever casing the user signed
+    // up with, MP normalizes to whatever the payer entered.
+    const { data } = await admin()
+      .from('profiles')
+      .select('id')
+      .ilike('email', pre.payer_email)
+      .maybeSingle()
+    userId = (data?.id as string | null) ?? null
+  }
   if (!userId) {
-    console.warn(`preapproval ${pre.id} has no external_reference — skipping`)
+    console.warn(
+      `preapproval ${pre.id} — no external_reference and no profile match for email=${pre.payer_email} — skipping`,
+    )
     return
   }
 
