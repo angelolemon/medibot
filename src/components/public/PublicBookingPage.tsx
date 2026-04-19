@@ -843,8 +843,7 @@ function SlotRail({
   const afternoon = currentDay.slots.filter((s) => parseInt(s.split(':')[0], 10) >= 13)
 
   return (
-    <div className={`bg-surface border-l border-gray-border p-8 overflow-y-auto scrollbar-hide flex flex-col relative transition-opacity duration-200 ${busy ? 'opacity-60' : 'opacity-100'}`}>
-      {busy && <BusyOverlay label="Actualizando horarios" />}
+    <div className={`bg-surface border-l border-gray-border p-8 overflow-y-auto scrollbar-hide flex flex-col transition-opacity duration-200 ${busy ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
       <div
         className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1.5"
         style={{ fontFamily: 'var(--font-mono)' }}
