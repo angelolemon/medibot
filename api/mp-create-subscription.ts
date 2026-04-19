@@ -7,10 +7,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
-const MP_PLAN_ID_PRO = process.env.MP_PLAN_ID_PRO ?? ''
-const MP_PLAN_ID_CLINIC = process.env.MP_PLAN_ID_CLINIC ?? ''
-const SUPABASE_URL = process.env.SUPABASE_URL ?? ''
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+// .trim() defensively — Vercel env var inputs sometimes capture trailing
+// newlines when values are pasted from the terminal. A stray \n in the plan
+// id becomes %0A in the URL and MP returns SUB03.
+const MP_PLAN_ID_PRO = (process.env.MP_PLAN_ID_PRO ?? '').trim()
+const MP_PLAN_ID_CLINIC = (process.env.MP_PLAN_ID_CLINIC ?? '').trim()
+const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').trim()
+const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
 
 let _admin: ReturnType<typeof createClient> | null = null
 function admin() {
