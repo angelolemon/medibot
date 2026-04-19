@@ -8,10 +8,10 @@
 import { supabase } from './supabase'
 import type { PlanId } from './plans'
 
-const FN_URL = (name: string) => {
-  const base = (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')
-  return `${base}/functions/v1/${name}`
-}
+// Billing endpoints run as Vercel serverless functions (co-located with the
+// frontend). Keeping the prefix simple so everything is on the same origin —
+// no CORS preflight, no Supabase gateway quirks.
+const FN_URL = (name: string) => `/api/${name}`
 
 /**
  * Start the upgrade flow for a plan. Redirects the browser to MercadoPago,
