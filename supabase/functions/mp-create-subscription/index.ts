@@ -64,59 +64,30 @@ Deno.serve(async (req) => {
   const mpPlanId = planId === "clinic" ? MP_PLAN_ID_CLINIC : MP_PLAN_ID_PRO
   if (!mpPlanId) return json({ error: "plan_not_configured" }, 500)
 
-  // Look up the doctor's email for the payer_email field.
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("email, first_name, last_name")
-    .eq("id", user.id)
-    .single()
-  const payerEmail = profile?.email ?? user.email ?? ""
+  // For "Suscripciones con plan asociado" we don't POST /preapproval (that
+  // endpoint requires a tokenized card). Instead we redirect to MP's hosted
+  // subscription checkout. After the user authorizes their card, MP creates
+  // the preapproval on our behalf — with our `external_reference` preserved —
+  // and fires the `subscription_preapproval` webhook that our mp-webhook
+  // function reconciles.
+  //
+  // The init_point format is documented under "Suscripciones con plan asociado":
+  //   https://www.mercadopago.com.ar/subscriptions/checkout?preapproval_plan_id={id}
+  const initPoint = new URL("https://www.mercadopago.com.ar/subscriptions/checkout")
+  initPoint.searchParams.set("preapproval_plan_id", mpPlanId)
+  initPoint.searchParams.set("external_reference", user.id)
 
-  // Create the preapproval linked to the plan.
-  const mpRes = await fetch("https://api.mercadopago.com/preapproval", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      preapproval_plan_id: mpPlanId,
-      reason: `MediBot ${planId === "clinic" ? "Clinic" : "Pro"}`,
-      external_reference: user.id,
-      payer_email: payerEmail,
-      back_url: `${PUBLIC_SITE_URL}/planes?upgrade=success`,
-      status: "pending",
-    }),
-  })
-
-  if (!mpRes.ok) {
-    const errText = await mpRes.text()
-    console.error("MP preapproval create failed", mpRes.status, errText)
-    return json({ error: "mp_error", detail: errText.slice(0, 300) }, 500)
-  }
-
-  const pre = (await mpRes.json()) as { id: string; init_point: string }
-
-  // Persist the preapproval id preemptively so a webhook that fires before the
-  // redirect has a user to reconcile against.
-  await admin
-    .from("profiles")
-    .update({
-      mp_preapproval_id: pre.id,
-      plan_status: "trialing", // will be confirmed by webhook
-    })
-    .eq("id", user.id)
-
+  // Log intent so we can trace issues even if the user bails from checkout.
   await admin.from("billing_events").insert({
     user_id: user.id,
     event_type: "preapproval.requested",
-    mp_resource_id: pre.id,
-    mp_resource_type: "preapproval",
+    mp_resource_id: mpPlanId,
+    mp_resource_type: "preapproval_plan",
     status: "pending",
     source: "api",
   })
 
-  return json({ init_point: pre.init_point, preapproval_id: pre.id }, 200)
+  return json({ init_point: initPoint.toString() }, 200)
 })
 
 function json(body: unknown, status = 200): Response {

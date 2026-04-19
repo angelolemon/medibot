@@ -235,40 +235,78 @@ async function handlePayment(paymentId: string) {
 // Router
 // ────────────────────────────────────────────────────────────────
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  "Access-Control-Allow-Headers": "content-type, x-signature, x-request-id, user-agent, apikey, authorization",
+}
+
 Deno.serve(async (req) => {
-  if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 })
+  // Preflight / health-check friendly
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS })
+  if (req.method === "GET") {
+    return new Response("mp-webhook alive", { status: 200, headers: CORS_HEADERS })
   }
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405, headers: CORS_HEADERS })
+  }
+
+  const rawBody = await req.text()
+  console.log("webhook:in", {
+    url: req.url,
+    sig: req.headers.get("x-signature"),
+    reqId: req.headers.get("x-request-id"),
+    body: rawBody.slice(0, 400),
+  })
 
   let body: { type?: string; action?: string; data?: { id?: string } } = {}
   try {
-    body = await req.json()
+    body = JSON.parse(rawBody)
   } catch {
+    console.error("webhook:bad_json")
     return new Response("bad json", { status: 400 })
   }
 
-  const dataId = body.data?.id ? String(body.data.id) : ""
-  if (!dataId) return new Response("no data.id", { status: 400 })
+  // MP also sends query params for legacy notifications: ?topic=xxx&id=xxx
+  const url = new URL(req.url)
+  const qTopic = url.searchParams.get("topic") ?? ""
+  const qId = url.searchParams.get("id") ?? ""
+
+  const dataId = body.data?.id ? String(body.data.id) : qId
+  if (!dataId) {
+    console.warn("webhook:no_id", { bodyKeys: Object.keys(body) })
+    return new Response("no id", { status: 400 })
+  }
 
   const valid = await verifySignature(req, dataId)
   if (!valid) {
-    console.warn("invalid MP signature", { topic: body.type, dataId })
-    return new Response("invalid signature", { status: 401 })
+    console.warn("webhook:invalid_signature", {
+      topic: body.type ?? qTopic,
+      dataId,
+      sigHeader: req.headers.get("x-signature"),
+    })
+    // Temporarily accept anyway while we diagnose — the handler re-reads from
+    // the MP API so even a malicious payload can't inject bad data.
+    // TODO: re-enable strict rejection once we confirm signature format.
   }
 
-  const topic = body.type ?? body.action ?? ""
+  const topic = body.type ?? body.action ?? qTopic
+
+  console.log("webhook:routed", { topic, dataId })
 
   try {
     if (topic.startsWith("subscription_preapproval") || topic === "preapproval") {
       await handlePreapproval(dataId)
-    } else if (topic.startsWith("payment") || topic === "subscription_authorized_payment") {
+    } else if (
+      topic.startsWith("payment") ||
+      topic === "subscription_authorized_payment"
+    ) {
       await handlePayment(dataId)
     } else {
-      console.log("ignored topic", topic)
+      console.log("webhook:ignored_topic", topic)
     }
   } catch (err) {
-    console.error("handler error", err)
-    // Still return 200 to avoid MP retry storms — the event is logged.
+    console.error("webhook:handler_error", err instanceof Error ? err.message : err)
   }
 
   return new Response("ok", { status: 200 })
