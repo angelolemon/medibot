@@ -932,9 +932,6 @@ function DaySlotsPanel({
   const isToday = currentDay.date === todayISO
   const railLabel = isToday ? 'Horarios del hoy' : `Horarios del ${dow.toLowerCase()}`
 
-  const morning = currentDay.slots.filter((s) => parseInt(s.split(':')[0], 10) < 13)
-  const afternoon = currentDay.slots.filter((s) => parseInt(s.split(':')[0], 10) >= 13)
-
   return (
     <div>
       <div
@@ -950,44 +947,13 @@ function DaySlotsPanel({
         <span className="italic">{dow}</span> {short}
       </div>
 
-      {morning.length > 0 && (
-        <SlotBlock title="Mañana" slots={morning} selectedTime={selectedTime} onPick={onPickSlot} />
-      )}
-      {afternoon.length > 0 && (
-        <SlotBlock title="Tarde" slots={afternoon} selectedTime={selectedTime} onPick={onPickSlot} last />
-      )}
-    </div>
-  )
-}
-
-function SlotBlock({
-  title,
-  slots,
-  selectedTime,
-  onPick,
-  last,
-}: {
-  title: string
-  slots: string[]
-  selectedTime: string | null
-  onPick: (s: string) => void
-  last?: boolean
-}) {
-  return (
-    <div className={last ? 'mt-4' : 'mt-4'}>
-      <div
-        className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-2"
-        style={{ fontFamily: 'var(--font-mono)' }}
-      >
-        {title}
-      </div>
-      <div className="grid grid-cols-3 gap-[6px]">
-        {slots.map((time) => {
+      <div className="grid grid-cols-3 gap-[6px] mt-4">
+        {currentDay.slots.map((time) => {
           const active = selectedTime === time
           return (
             <button
               key={time}
-              onClick={() => onPick(time)}
+              onClick={() => onPickSlot(time)}
               className={`py-[11px] text-center rounded-[8px] text-[13px] font-medium border transition-colors cursor-pointer ${
                 active
                   ? 'bg-primary text-surface border-primary'
