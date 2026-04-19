@@ -259,6 +259,13 @@ export default function BookingModal({ doctor, slot, location, onClose, onSucces
           >
             {loading ? 'Confirmando…' : 'Confirmar turno'}
           </button>
+          <div className="text-center text-[11px] text-text-hint mt-3 leading-[1.5]">
+            Al confirmar aceptás nuestra{' '}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-text">
+              Política de privacidad
+            </a>
+            .
+          </div>
         </div>
       </div>
     </div>

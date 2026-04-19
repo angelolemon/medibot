@@ -452,20 +452,6 @@ export default function PublicBookingPage({ bookingCode }: Props) {
         )}
       </main>
 
-      <footer
-        className="text-[10px] text-text-hint uppercase tracking-[0.18em] py-4 px-6 lg:px-10 border-t border-gray-border flex items-center justify-between shrink-0"
-        style={{ fontFamily: 'var(--font-mono)' }}
-        role="contentinfo"
-      >
-        <div>
-          <a href="/" className="hover:text-text cursor-pointer">MediBot</a> · reservá con cualquier médico
-        </div>
-        <nav className="hidden sm:flex gap-4" aria-label="Enlaces de ayuda">
-          <a href="/ayuda" className="hover:text-text cursor-pointer">Ayuda</a>
-          <a href="/privacy" className="hover:text-text cursor-pointer">Privacidad</a>
-        </nav>
-      </footer>
-
       {openBooking && selectedSlot && (
         <BookingModal
           doctor={doctor}
