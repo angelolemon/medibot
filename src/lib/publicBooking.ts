@@ -61,6 +61,23 @@ export interface PublicLocation {
   is_primary: boolean
 }
 
+// Deterministic pin palette used to color-code each location in the public
+// booking page. Index 0 (primary) always gets the house sage.
+export const LOCATION_PALETTE = [
+  { swatch: '#3B4A38', key: 'primary' }, // sage
+  { swatch: '#A24A32', key: 'coral' },   // coral
+  { swatch: '#4F7565', key: 'teal' },    // teal
+  { swatch: '#B4893A', key: 'amber' },   // amber
+] as const
+
+export function locationColor(index: number): string {
+  return LOCATION_PALETTE[index % LOCATION_PALETTE.length].swatch
+}
+
+export interface DaySlotsGrouped extends DaySlots {
+  locationId: string | null
+}
+
 export async function getPublicDoctorLocations(doctorId: string): Promise<PublicLocation[]> {
   const { data } = await supabase
     .from('locations')
@@ -178,6 +195,45 @@ export async function getAvailableSlotsRange(doctorId: string, daysAhead = 14, l
   }
 
   return result
+}
+
+/**
+ * Fetch availability across ALL the doctor's locations at once.
+ *
+ * Each future date is assigned to the FIRST location (in the given order —
+ * primary is expected to be first) whose `work_days` matches that weekday.
+ * This mirrors `resolveLocationForDate` so the public page picks the same
+ * office the agenda would.
+ *
+ * Returns days sorted ascending, each with its owning `locationId`.
+ * Dates where no location matches are omitted.
+ */
+export async function getGroupedAvailableSlots(
+  doctorId: string,
+  locations: PublicLocation[],
+  daysAhead = 30,
+): Promise<DaySlotsGrouped[]> {
+  if (!locations || locations.length === 0) {
+    const flat = await getAvailableSlotsRange(doctorId, daysAhead, null)
+    return flat.map((s) => ({ ...s, locationId: null }))
+  }
+
+  // Query each location's slots in parallel.
+  const perLocation = await Promise.all(
+    locations.map(async (loc) => {
+      const slots = await getAvailableSlotsRange(doctorId, daysAhead, loc.id)
+      return slots.map((s) => ({ ...s, locationId: loc.id }))
+    }),
+  )
+
+  // Merge: first occurrence of a date wins (locations are expected primary-first).
+  const byDate = new Map<string, DaySlotsGrouped>()
+  for (const dayList of perLocation) {
+    for (const day of dayList) {
+      if (!byDate.has(day.date)) byDate.set(day.date, day)
+    }
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))
 }
 
 export interface BookingRequest {

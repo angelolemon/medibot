@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { getDoctorByBookingCode, getAvailableSlotsRange, getPublicDoctorLocations, type PublicDoctor, type PublicLocation, type DaySlots } from '../../lib/publicBooking'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  getDoctorByBookingCode,
+  getGroupedAvailableSlots,
+  getPublicDoctorLocations,
+  locationColor,
+  type DaySlotsGrouped,
+  type PublicDoctor,
+  type PublicLocation,
+} from '../../lib/publicBooking'
 import BookingModal from './BookingModal'
 import Icon from '../Icon'
 
@@ -15,37 +23,39 @@ function formatDayChip(dateISO: string) {
   const todayISO = new Date().toISOString().split('T')[0]
   const tomorrowISO = new Date(Date.now() + 86400000).toISOString().split('T')[0]
   const dow = DOW_SHORT[d.getDay()]
-  const dayNum = d.getDate()
-  const month = MONTHS_SHORT[d.getMonth()]
   let heading = dow
   if (dateISO === todayISO) heading = 'HOY'
   else if (dateISO === tomorrowISO) heading = 'MAÑ'
-  return {
-    heading,
-    dayNum,
-    month,
-    dateISO,
-  }
+  return { heading, dayNum: d.getDate(), month: MONTHS_SHORT[d.getMonth()], dateISO }
+}
+
+// Translate a location's work_days array into a human short label (e.g. "Lun, Mié, Vie")
+function workDaysLabel(days: string[] | null | undefined): string {
+  if (!days || days.length === 0) return ''
+  if (days.length === 7) return 'Todos los días'
+  if (days.length === 5 && days.includes('Lun') && days.includes('Vie')) return 'Lun a Vie'
+  return days.join(', ')
 }
 
 export default function PublicBookingPage({ bookingCode }: Props) {
   const [doctor, setDoctor] = useState<PublicDoctor | null>(null)
   const [locations, setLocations] = useState<PublicLocation[]>([])
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null)
+  const [allSlots, setAllSlots] = useState<DaySlotsGrouped[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [daysToShow, setDaysToShow] = useState(30)
-  const [allSlots, setAllSlots] = useState<DaySlots[]>([])
+
+  // Selection state
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
-  const [selectedSlot, setSelectedSlot] = useState<{ date: string; time: string; dayLabel: string } | null>(null)
-  const [openBooking, setOpenBooking] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [pickedTime, setPickedTime] = useState<string | null>(null)
-  const [switchingLocation, setSwitchingLocation] = useState(false)
-  const firstLocationRun = useRef(true)
+  const [manualLocationId, setManualLocationId] = useState<string | null>(null)
+
+  const [selectedSlot, setSelectedSlot] = useState<
+    { date: string; time: string; dayLabel: string } | null
+  >(null)
+  const [openBooking, setOpenBooking] = useState(false)
 
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       const doc = await getDoctorByBookingCode(bookingCode)
       if (!doc) {
         setNotFound(true)
@@ -56,65 +66,62 @@ export default function PublicBookingPage({ bookingCode }: Props) {
 
       const locs = await getPublicDoctorLocations(doc.id)
       setLocations(locs)
-      const primaryLocId = locs[0]?.id ?? null
-      setSelectedLocationId(primaryLocId)
 
-      let slots = await getAvailableSlotsRange(doc.id, 30, primaryLocId)
-      if (slots.length === 0) {
-        slots = await getAvailableSlotsRange(doc.id, 60, primaryLocId)
-        setDaysToShow(60)
-      }
+      const slots = await getGroupedAvailableSlots(doc.id, locs, 45)
       setAllSlots(slots)
-      setSelectedDay(slots[0]?.date ?? null)
       setLoading(false)
     })()
   }, [bookingCode])
 
-  // Refetch slots when the user switches location
-  useEffect(() => {
-    if (!doctor || !selectedLocationId) return
-    if (firstLocationRun.current) {
-      // Initial load already fetched slots in the main bootstrap effect.
-      firstLocationRun.current = false
-      return
-    }
-    setSwitchingLocation(true)
-    setPickedTime(null)
-    ;(async () => {
-      const slots = await getAvailableSlotsRange(doctor.id, daysToShow, selectedLocationId)
-      setAllSlots(slots)
-      setSelectedDay(slots[0]?.date ?? null)
-      setSwitchingLocation(false)
-    })()
-  }, [selectedLocationId, doctor?.id])
+  // Indexes for quick lookup
+  const locationsById = useMemo(() => {
+    const m = new Map<string, { loc: PublicLocation; color: string; index: number }>()
+    locations.forEach((loc, i) => m.set(loc.id, { loc, color: locationColor(i), index: i }))
+    return m
+  }, [locations])
 
-  const MAX_DAYS = 60
-
-  const handleLoadMore = async () => {
-    if (!doctor) return
-    setLoadingMore(true)
-    const newDaysToShow = Math.min(daysToShow + 30, MAX_DAYS)
-    const slots = await getAvailableSlotsRange(doctor.id, newDaysToShow, selectedLocationId)
-    setAllSlots(slots)
-    setDaysToShow(newDaysToShow)
-    setLoadingMore(false)
-  }
-
-  const canLoadMore = daysToShow < MAX_DAYS
-
-  const handleBookingSuccess = async () => {
-    if (doctor) {
-      const slots = await getAvailableSlotsRange(doctor.id, daysToShow, selectedLocationId)
-      setAllSlots(slots)
-    }
-  }
-
-  const currentLocation = locations.find((l) => l.id === selectedLocationId) ?? locations[0] ?? null
-
+  // The day currently picked in the calendar (full record)
   const currentDay = useMemo(
-    () => allSlots.find((d) => d.date === selectedDay) ?? allSlots[0],
+    () => allSlots.find((d) => d.date === selectedDay) ?? null,
     [allSlots, selectedDay],
   )
+
+  // Effective location (derived): manual pick wins; otherwise, whatever the selected date owns.
+  const effectiveLocationId = manualLocationId ?? currentDay?.locationId ?? null
+  const effectiveLocation = effectiveLocationId
+    ? (locationsById.get(effectiveLocationId)?.loc ?? null)
+    : null
+
+  const fullAddress = effectiveLocation?.address
+    ? `${effectiveLocation.address}${effectiveLocation.city ? ', ' + effectiveLocation.city : ''}`
+    : doctor?.address
+      ? `${doctor.address}${doctor.city ? ', ' + doctor.city : ''}`
+      : ''
+
+  const handleBookingSuccess = async () => {
+    if (!doctor) return
+    const slots = await getGroupedAvailableSlots(doctor.id, locations, 45)
+    setAllSlots(slots)
+  }
+
+  const handleOfficeClick = (locId: string) => {
+    if (manualLocationId === locId) {
+      // Toggle off → back to auto mode
+      setManualLocationId(null)
+    } else {
+      setManualLocationId(locId)
+      // If the currently selected day doesn't belong to this location, clear it
+      if (currentDay && currentDay.locationId !== locId) {
+        setSelectedDay(null)
+        setPickedTime(null)
+      }
+    }
+  }
+
+  const handleDayClick = (iso: string) => {
+    if (selectedDay !== iso) setPickedTime(null)
+    setSelectedDay(iso)
+  }
 
   if (loading) {
     return (
@@ -154,33 +161,31 @@ export default function PublicBookingPage({ bookingCode }: Props) {
   }
 
   const initials = `${doctor.first_name[0]}${doctor.last_name[0]}`.toUpperCase()
-  // Use the selected location's address if available, otherwise fallback to profile
-  const addrSource = currentLocation ?? { address: doctor.address, city: doctor.city }
-  const fullAddress = addrSource.address ? `${addrSource.address}${addrSource.city ? ', ' + addrSource.city : ''}` : ''
-  const mapUrl = fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null
+  const mapUrl = fullAddress
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`
+    : null
 
   return (
     <div
       className="min-h-screen flex flex-col"
       style={{ background: 'var(--color-bg)', fontFamily: 'var(--font-sans)', color: 'var(--color-text)' }}
     >
-      {/* SEO: hidden single H1 for screen readers + crawlers */}
       <h1 className="sr-only">
         Reservá turno con {doctor.first_name} {doctor.last_name}
         {doctor.specialty ? ` — ${doctor.specialty}` : ''}
-        {fullAddress ? ` en ${fullAddress}` : ''}
       </h1>
 
       {/* Header */}
       <header className="bg-surface border-b border-gray-border" role="banner">
         <div className="px-6 lg:px-10 py-3.5 flex items-center justify-between">
           <div className="flex items-baseline gap-3">
-            <div
-              className="text-[16px] italic text-text font-medium"
+            <a
+              href="/"
+              className="text-[16px] italic text-text font-medium cursor-pointer"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               MediBot
-            </div>
+            </a>
             <div
               className="hidden sm:block text-[11px] text-text-hint"
               style={{ fontFamily: 'var(--font-mono)' }}
@@ -197,11 +202,16 @@ export default function PublicBookingPage({ bookingCode }: Props) {
         </div>
       </header>
 
-      {/* Mobile: compact doctor header above accordion */}
-      <section className="lg:hidden bg-surface border-b border-gray-border px-6 py-5" aria-label="Profesional">
+      {/* MOBILE — compact doctor header */}
+      <section
+        className="lg:hidden bg-surface border-b border-gray-border px-6 py-5"
+        aria-label="Profesional"
+      >
         <div className="flex items-start gap-4">
-          <div className="w-[60px] h-[60px] rounded-full bg-primary-light text-primary grid place-items-center text-[18px] shrink-0 overflow-hidden"
-            style={{ fontFamily: 'var(--font-serif)' }}>
+          <div
+            className="w-[60px] h-[60px] rounded-full bg-primary-light text-primary grid place-items-center text-[18px] shrink-0 overflow-hidden"
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
             {doctor.avatar_url ? (
               <img
                 src={doctor.avatar_url}
@@ -254,15 +264,8 @@ export default function PublicBookingPage({ bookingCode }: Props) {
       </section>
 
       {/* DESKTOP — 3 column layout (sidebar · calendar · rail) */}
-      <main className="hidden lg:grid lg:grid-cols-[280px_1fr_380px] flex-1 min-h-0" role="main">
-        <DoctorSidebar
-          doctor={doctor}
-          initials={initials}
-          locations={locations}
-          selectedLocationId={selectedLocationId}
-          onSelectLocation={setSelectedLocationId}
-          currentLocation={currentLocation}
-        />
+      <main className="hidden lg:grid lg:grid-cols-[280px_1fr_360px] flex-1 min-h-0" role="main">
+        <DoctorSidebar doctor={doctor} initials={initials} />
 
         {allSlots.length === 0 ? (
           <div className="col-span-2 flex items-center justify-center">
@@ -281,24 +284,29 @@ export default function PublicBookingPage({ bookingCode }: Props) {
             <CalendarGrid
               allSlots={allSlots}
               selectedDay={selectedDay}
-              onSelectDay={(d) => { setSelectedDay(d); setPickedTime(null) }}
-              daysToShow={daysToShow}
-              canLoadMore={canLoadMore}
-              onLoadMore={handleLoadMore}
-              loadingMore={loadingMore}
-              stepIndex={0}
-              busy={switchingLocation}
+              onSelectDay={handleDayClick}
+              manualLocationId={manualLocationId}
+              locationsById={locationsById}
+              stepIndex={pickedTime ? 1 : 0}
             />
-            <SlotRail
+            <RightRail
+              locations={locations}
+              locationsById={locationsById}
+              manualLocationId={manualLocationId}
+              effectiveLocationId={effectiveLocationId}
+              onOfficeClick={handleOfficeClick}
               currentDay={currentDay}
               selectedTime={pickedTime}
-              onPickSlot={(time) => setPickedTime(time)}
+              onPickSlot={setPickedTime}
               onConfirm={() => {
                 if (!currentDay || !pickedTime) return
-                setSelectedSlot({ date: currentDay.date, time: pickedTime, dayLabel: currentDay.dayLabel })
+                setSelectedSlot({
+                  date: currentDay.date,
+                  time: pickedTime,
+                  dayLabel: currentDay.dayLabel,
+                })
                 setOpenBooking(true)
               }}
-              busy={switchingLocation}
             />
           </>
         )}
@@ -306,33 +314,43 @@ export default function PublicBookingPage({ bookingCode }: Props) {
 
       {/* MOBILE — accordion list */}
       <main className="lg:hidden flex-1 flex flex-col" role="main">
-        {/* Location picker if multi */}
         {locations.length > 1 && (
           <div className="px-4 pt-5">
             <div
               className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-2"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              Consultorio
+              Consultorio · <span className="normal-case tracking-normal italic text-text-hint" style={{ fontFamily: 'var(--font-sans)' }}>
+                {manualLocationId ? 'filtrando el calendario' : 'se elige con la fecha'}
+              </span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-1.5">
               {locations.map((loc) => {
-                const active = selectedLocationId === loc.id
+                const meta = locationsById.get(loc.id)!
+                const active = manualLocationId === loc.id
                 return (
                   <button
                     key={loc.id}
-                    onClick={() => setSelectedLocationId(loc.id)}
-                    className={`text-left px-3.5 py-2.5 rounded-[10px] border cursor-pointer transition-colors flex-1 min-w-[160px] ${
+                    onClick={() => handleOfficeClick(loc.id)}
+                    className={`text-left px-3.5 py-2.5 rounded-[10px] border cursor-pointer transition-colors flex items-start gap-2.5 ${
                       active
-                        ? 'bg-primary-light border-primary-mid'
+                        ? 'bg-primary-light border-primary'
                         : 'bg-surface border-gray-border hover:bg-surface-2'
                     }`}
                   >
-                    <div className={`text-[13px] font-medium ${active ? 'text-primary' : 'text-text'}`}>
-                      {loc.name}
-                    </div>
-                    <div className="text-[11px] text-text-muted mt-0.5 truncate">
-                      {loc.address}{loc.city && `, ${loc.city}`}
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0 mt-[6px]"
+                      style={{ backgroundColor: meta.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-[13px] font-medium ${active ? 'text-primary' : 'text-text'}`}>
+                        {loc.name}
+                      </div>
+                      <div className="text-[11px] text-text-muted mt-0.5 truncate">
+                        {loc.address}
+                        {loc.city && `, ${loc.city}`}
+                        {loc.work_days && loc.work_days.length > 0 && ` · ${workDaysLabel(loc.work_days)}`}
+                      </div>
                     </div>
                   </button>
                 )
@@ -363,16 +381,19 @@ export default function PublicBookingPage({ bookingCode }: Props) {
               {allSlots.map((day) => {
                 const open = selectedDay === day.date
                 const chip = formatDayChip(day.date)
+                const dimmed = manualLocationId !== null && day.locationId !== manualLocationId
+                const pinColor = day.locationId ? locationsById.get(day.locationId)?.color : null
                 return (
                   <div
                     key={day.date}
-                    className={`bg-surface rounded-[12px] border overflow-hidden ${
+                    className={`bg-surface rounded-[12px] border overflow-hidden transition-opacity ${
                       open ? 'border-primary' : 'border-gray-border'
-                    }`}
+                    } ${dimmed ? 'opacity-30' : ''}`}
                   >
                     <button
-                      onClick={() => setSelectedDay(open ? null : day.date)}
-                      className="w-full px-4 py-3 flex items-center gap-3.5 cursor-pointer text-left"
+                      onClick={() => !dimmed && setSelectedDay(open ? null : day.date)}
+                      disabled={dimmed}
+                      className="w-full px-4 py-3 flex items-center gap-3.5 cursor-pointer text-left disabled:cursor-not-allowed"
                     >
                       <div className="text-center min-w-[40px]">
                         <div
@@ -389,9 +410,19 @@ export default function PublicBookingPage({ bookingCode }: Props) {
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-medium text-text capitalize">{day.dayLabel}</div>
+                        <div className="text-[13px] font-medium text-text capitalize flex items-center gap-2">
+                          {day.dayLabel}
+                          {pinColor && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full inline-block"
+                              style={{ backgroundColor: pinColor }}
+                              aria-hidden
+                            />
+                          )}
+                        </div>
                         <div className="text-[11px] text-text-hint mt-0.5">
-                          {day.slots.length} {day.slots.length === 1 ? 'horario disponible' : 'horarios disponibles'}
+                          {day.slots.length}{' '}
+                          {day.slots.length === 1 ? 'horario disponible' : 'horarios disponibles'}
                         </div>
                       </div>
                       <div
@@ -416,21 +447,11 @@ export default function PublicBookingPage({ bookingCode }: Props) {
                   </div>
                 )
               })}
-              {canLoadMore && (
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="mt-2 w-full py-3 rounded-[12px] text-[13px] bg-surface border border-gray-border-2 text-text-muted hover:bg-surface-2 transition-colors disabled:opacity-60"
-                >
-                  {loadingMore ? 'Cargando…' : 'Ver más días'}
-                </button>
-              )}
             </div>
           </div>
         )}
       </main>
 
-      {/* Footer */}
       <footer
         className="text-[10px] text-text-hint uppercase tracking-[0.18em] py-4 px-6 lg:px-10 border-t border-gray-border flex items-center justify-between"
         style={{ fontFamily: 'var(--font-mono)' }}
@@ -449,7 +470,7 @@ export default function PublicBookingPage({ bookingCode }: Props) {
         <BookingModal
           doctor={doctor}
           slot={selectedSlot}
-          location={currentLocation}
+          location={effectiveLocation}
           onClose={() => setOpenBooking(false)}
           onSuccess={async () => {
             await handleBookingSuccess()
@@ -461,35 +482,16 @@ export default function PublicBookingPage({ bookingCode }: Props) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Doctor sidebar (desktop) — full profile + consultorio picker
+// Doctor sidebar (desktop, simplified)
 // ────────────────────────────────────────────────────────────────
 
-function DoctorSidebar({
-  doctor,
-  initials,
-  locations,
-  selectedLocationId,
-  onSelectLocation,
-  currentLocation,
-}: {
-  doctor: PublicDoctor
-  initials: string
-  locations: PublicLocation[]
-  selectedLocationId: string | null
-  onSelectLocation: (id: string) => void
-  currentLocation: PublicLocation | null
-}) {
-  const addrSource = currentLocation ?? { address: doctor.address, city: doctor.city }
-  const fullAddress = addrSource.address ? `${addrSource.address}${addrSource.city ? ', ' + addrSource.city : ''}` : ''
-  const mapUrl = fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null
+function DoctorSidebar({ doctor, initials }: { doctor: PublicDoctor; initials: string }) {
   const duration = `${doctor.session_duration || 50} min`
-
   return (
     <aside className="bg-surface border-r border-gray-border p-8 overflow-y-auto scrollbar-hide">
-      {/* Avatar + identity */}
       <div
-        className="w-12 h-12 rounded-full bg-primary-light text-primary grid place-items-center text-[15px] overflow-hidden mb-5"
-        style={{ fontFamily: 'var(--font-serif)' }}
+        className="w-12 h-12 rounded-full bg-primary-light text-primary grid place-items-center text-[17px] overflow-hidden mb-[14px]"
+        style={{ fontFamily: 'var(--font-serif)', border: '1px solid rgba(59,74,56,0.15)' }}
       >
         {doctor.avatar_url ? (
           <img
@@ -508,21 +510,21 @@ function DoctorSidebar({
       </div>
       {doctor.specialty && (
         <div
-          className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1.5"
+          className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           {doctor.specialty}
         </div>
       )}
       <div
-        className="text-[22px] font-normal text-text leading-[1.1] tracking-[-0.02em]"
+        className="text-[22px] font-medium text-text leading-[1.15] tracking-[-0.02em]"
         style={{ fontFamily: 'var(--font-serif)' }}
       >
         {doctor.first_name} {doctor.last_name}
       </div>
       {doctor.license && (
         <div
-          className="text-[11px] text-text-hint mt-1.5"
+          className="text-[11px] text-text-hint mt-1"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
           MN · {doctor.license}
@@ -530,191 +532,118 @@ function DoctorSidebar({
       )}
 
       {doctor.bio && (
-        <div
-          className="text-[13px] text-text-muted leading-[1.55] mt-5 italic"
+        <p
+          className="text-[13px] text-text-muted leading-[1.55] mt-[18px] italic"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           {doctor.bio}
-        </div>
+        </p>
       )}
 
-      <div className="border-t border-gray-border my-6" />
-
-      {/* Consultorio / Duración / Coberturas */}
-      <div className="space-y-4">
-        {currentLocation && (
-          <div>
-            <div
-              className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              Consultorio
-            </div>
-            <div className="text-[13px] text-text font-medium">{currentLocation.name}</div>
-            {fullAddress && (
-              <div className="text-[12px] text-text-muted mt-0.5 leading-[1.5]">
-                {fullAddress}
-                {mapUrl && (
-                  <>
-                    {' · '}
-                    <a
-                      href={mapUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary font-medium hover:underline"
-                    >
-                      Cómo llegar
-                    </a>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
+      <div className="mt-[22px] pt-4 border-t border-gray-border grid gap-3">
         <div>
           <div
-            className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1"
+            className="text-[9px] text-text-hint uppercase tracking-[0.14em] mb-[3px]"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             Duración
           </div>
-          <div className="text-[13px] text-text">{duration}</div>
+          <div className="text-[12.5px] text-text">{duration}</div>
         </div>
-
         {doctor.price_particular && (
           <div>
             <div
-              className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1"
+              className="text-[9px] text-text-hint uppercase tracking-[0.14em] mb-[3px]"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               Valor particular
             </div>
-            <div className="text-[13px] text-text">${doctor.price_particular.toLocaleString('es-AR')}</div>
+            <div className="text-[12.5px] text-text">
+              ${doctor.price_particular.toLocaleString('es-AR')}
+            </div>
           </div>
         )}
-
       </div>
-
-      {/* Location picker — only if multi */}
-      {locations.length > 1 && (
-        <>
-          <div className="border-t border-gray-border my-6" />
-          <div
-            className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-2"
-            style={{ fontFamily: 'var(--font-mono)' }}
-          >
-            Cambiar consultorio
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {locations.map((loc) => {
-              const active = selectedLocationId === loc.id
-              return (
-                <button
-                  key={loc.id}
-                  onClick={() => onSelectLocation(loc.id)}
-                  className={`text-left px-3 py-2 rounded-[8px] border cursor-pointer transition-colors ${
-                    active
-                      ? 'bg-primary-light border-primary-mid'
-                      : 'bg-surface border-gray-border hover:bg-surface-2'
-                  }`}
-                >
-                  <div className={`text-[12px] font-medium ${active ? 'text-primary' : 'text-text'}`}>
-                    {loc.name}
-                  </div>
-                  <div className="text-[11px] text-text-muted mt-0.5 truncate">
-                    {loc.address}{loc.city && `, ${loc.city}`}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </>
-      )}
     </aside>
   )
 }
 
 // ────────────────────────────────────────────────────────────────
-// Calendar grid (desktop) — 21-day view starting on the week's Monday
+// Calendar grid (desktop) — Monday-first weekly grid with location pin
 // ────────────────────────────────────────────────────────────────
 
 function CalendarGrid({
   allSlots,
   selectedDay,
   onSelectDay,
-  daysToShow,
-  canLoadMore,
-  onLoadMore,
-  loadingMore,
+  manualLocationId,
+  locationsById,
   stepIndex,
-  busy,
 }: {
-  allSlots: DaySlots[]
+  allSlots: DaySlotsGrouped[]
   selectedDay: string | null
   onSelectDay: (iso: string) => void
-  daysToShow: number
-  canLoadMore: boolean
-  onLoadMore: () => Promise<void>
-  loadingMore: boolean
+  manualLocationId: string | null
+  locationsById: Map<string, { loc: PublicLocation; color: string; index: number }>
   stepIndex: number
-  busy: boolean
 }) {
-  // Build a slot-count map for quick lookup
-  const slotCounts = new Map<string, number>()
-  for (const d of allSlots) slotCounts.set(d.date, d.slots.length)
+  const slotMap = new Map<string, DaySlotsGrouped>()
+  for (const d of allSlots) slotMap.set(d.date, d)
 
-  // Grid starts on the Monday of the current week; spans N weeks based on daysToShow.
-  const weeks = Math.max(3, Math.ceil(daysToShow / 7) + 1)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const todayISO = toISO(today)
-  // Go back to Monday (Mon=1, Sun=0 → offset)
-  const dayOfWeek = today.getDay()
-  const offsetToMonday = (dayOfWeek + 6) % 7
+  const weeks = 4
+  const dow = today.getDay()
+  const offsetToMonday = (dow + 6) % 7
   const start = new Date(today)
   start.setDate(today.getDate() - offsetToMonday)
 
-  const grid: Array<Array<{ iso: string; num: number; inPast: boolean; isToday: boolean; slots: number }>> = []
+  const grid: Array<
+    Array<{
+      iso: string
+      num: number
+      inPast: boolean
+      isToday: boolean
+      day: DaySlotsGrouped | undefined
+    }>
+  > = []
   for (let w = 0; w < weeks; w++) {
-    const row = []
-    for (let d = 0; d < 7; d++) {
-      const cellDate = new Date(start)
-      cellDate.setDate(start.getDate() + w * 7 + d)
-      const iso = toISO(cellDate)
-      const inPast = cellDate < today
+    const row: (typeof grid)[number] = []
+    for (let di = 0; di < 7; di++) {
+      const cell = new Date(start)
+      cell.setDate(start.getDate() + w * 7 + di)
+      const iso = toISO(cell)
       row.push({
         iso,
-        num: cellDate.getDate(),
-        inPast,
+        num: cell.getDate(),
+        inPast: cell < today,
         isToday: iso === todayISO,
-        slots: slotCounts.get(iso) ?? 0,
+        day: slotMap.get(iso),
       })
     }
     grid.push(row)
   }
 
   const monthName = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
-
   const steps = ['Horario', 'Datos', 'Listo']
 
   return (
-    <div className={`px-10 py-9 overflow-y-auto scrollbar-hide relative transition-opacity duration-200 ${busy ? 'opacity-60' : 'opacity-100'}`}>
-      {busy && <BusyOverlay label="Actualizando agenda" />}
-      <div className="flex items-start justify-between mb-6 gap-6">
+    <div className="px-9 py-8 overflow-y-auto scrollbar-hide">
+      <div className="flex items-start justify-between mb-[22px] gap-6">
         <div>
           <div
-            className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1.5"
+            className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             Agenda pública · <span className="capitalize">{monthName}</span>
           </div>
-          <h1
-            className="text-[28px] lg:text-[32px] font-normal leading-[1.05] tracking-[-0.025em] m-0 text-text"
+          <h2
+            className="text-[32px] font-medium leading-[1.05] tracking-[-0.025em] m-0 text-text"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
             Elegí el día que <span className="italic">te queda mejor</span>
-          </h1>
+          </h2>
         </div>
         <div
           className="flex items-center gap-2 pt-1 shrink-0"
@@ -726,36 +655,35 @@ function CalendarGrid({
             return (
               <div key={s} className="flex items-center gap-2">
                 <div
-                  className={`w-5 h-5 rounded-full grid place-items-center text-[10px] border ${
+                  className={`w-[17px] h-[17px] rounded-full grid place-items-center text-[9px] border ${
                     active
-                      ? 'bg-primary text-surface border-primary'
+                      ? 'bg-text text-surface border-text'
                       : done
                         ? 'bg-primary-light text-primary border-primary-mid'
-                        : 'bg-surface text-text-hint border-gray-border'
+                        : 'bg-surface text-text-hint border-text-dim'
                   }`}
                 >
                   {i + 1}
                 </div>
                 <div
                   className={`text-[10px] uppercase tracking-[0.14em] ${
-                    active ? 'text-text' : 'text-text-hint'
+                    active ? 'text-text' : 'text-text-dim'
                   }`}
                 >
                   {s}
                 </div>
-                {i < steps.length - 1 && <div className="w-4 h-px bg-gray-border" />}
+                {i < steps.length - 1 && <div className="w-6 h-px bg-gray-border" />}
               </div>
             )
           })}
         </div>
       </div>
 
-      {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-2 mb-2">
+      <div className="grid grid-cols-7 gap-[7px] mb-[9px]">
         {['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'].map((d) => (
           <div
             key={d}
-            className="text-[10px] text-text-hint uppercase tracking-[0.14em] pl-1"
+            className="text-[10px] text-text-hint uppercase tracking-[0.14em] pl-[2px]"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             {d}
@@ -763,47 +691,63 @@ function CalendarGrid({
         ))}
       </div>
 
-      {/* Grid */}
-      <div className="grid gap-2">
+      <div className="grid gap-[7px]">
         {grid.map((row, wi) => (
-          <div key={wi} className="grid grid-cols-7 gap-2">
+          <div key={wi} className="grid grid-cols-7 gap-[7px]">
             {row.map((cell) => {
-              const available = cell.slots > 0
+              const day = cell.day
+              const available = !!day
               const selected = selectedDay === cell.iso
+              const belongsToManual =
+                !manualLocationId || (day && day.locationId === manualLocationId)
+              const dimmed = available && !belongsToManual
+              const pinColor = day?.locationId ? locationsById.get(day.locationId)?.color : null
+
               return (
                 <button
                   key={cell.iso}
-                  disabled={!available}
-                  onClick={() => available && onSelectDay(cell.iso)}
-                  className={`aspect-square p-3 rounded-[10px] border text-left flex flex-col justify-between transition-colors ${
+                  disabled={!available || dimmed}
+                  onClick={() => available && belongsToManual && onSelectDay(cell.iso)}
+                  className={`aspect-square p-[10px] rounded-[10px] border text-left flex flex-col justify-between transition-opacity ${
                     selected
                       ? 'bg-primary border-primary text-surface'
                       : available
                         ? 'bg-surface border-gray-border text-text hover:border-gray-border-2 cursor-pointer'
                         : 'bg-transparent border-transparent text-text-dim cursor-not-allowed'
-                  }`}
+                  } ${dimmed ? 'opacity-30 pointer-events-none' : ''}`}
+                  style={{ fontFamily: 'var(--font-serif)' }}
                 >
                   <div className="flex items-start justify-between">
                     <div
-                      className="text-[22px] font-medium leading-none tracking-[-0.02em]"
-                      style={{ fontFamily: 'var(--font-serif)' }}
+                      className="text-[22px] font-medium leading-none tracking-[-0.015em]"
                     >
                       {cell.num}
                     </div>
                     {cell.isToday && (
                       <div
-                        className="text-[9px] uppercase tracking-[0.14em] opacity-70"
+                        className="text-[8px] uppercase tracking-[0.14em] opacity-70"
                         style={{ fontFamily: 'var(--font-mono)' }}
                       >
                         Hoy
                       </div>
                     )}
                   </div>
-                  <div
-                    className={`text-[10px] ${selected ? 'opacity-70' : available ? 'opacity-55' : 'opacity-40'}`}
-                    style={{ fontFamily: 'var(--font-mono)' }}
-                  >
-                    {available ? `${cell.slots} libres` : '—'}
+                  <div className="flex flex-col gap-[4px]">
+                    <div
+                      className={`text-[10px] ${selected ? 'opacity-70' : available ? 'opacity-55' : 'opacity-40'}`}
+                      style={{ fontFamily: 'var(--font-mono)' }}
+                    >
+                      {available ? `${day.slots.length} libres` : '—'}
+                    </div>
+                    {pinColor && (
+                      <div className="flex gap-[3px]">
+                        <span
+                          className="w-[5px] h-[5px] rounded-full"
+                          style={{ backgroundColor: selected ? '#F5F2EC' : pinColor }}
+                          aria-hidden
+                        />
+                      </div>
+                    )}
                   </div>
                 </button>
               )
@@ -811,51 +755,143 @@ function CalendarGrid({
           </div>
         ))}
       </div>
-
-      {canLoadMore && (
-        <button
-          onClick={onLoadMore}
-          disabled={loadingMore}
-          className="mt-5 w-full py-3 rounded-[10px] text-[12px] bg-surface border border-gray-border-2 text-text-muted hover:bg-surface-2 transition-colors disabled:opacity-60"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          {loadingMore ? 'Cargando…' : 'Ver más semanas'}
-        </button>
-      )}
     </div>
   )
 }
 
 // ────────────────────────────────────────────────────────────────
-// Right rail — slots for selected day (desktop)
+// Right rail — office selector on top, slots below
 // ────────────────────────────────────────────────────────────────
 
-function SlotRail({
+function RightRail({
+  locations,
+  locationsById,
+  manualLocationId,
+  effectiveLocationId,
+  onOfficeClick,
   currentDay,
   selectedTime,
   onPickSlot,
   onConfirm,
-  busy,
 }: {
-  currentDay: DaySlots | undefined
+  locations: PublicLocation[]
+  locationsById: Map<string, { loc: PublicLocation; color: string; index: number }>
+  manualLocationId: string | null
+  effectiveLocationId: string | null
+  onOfficeClick: (id: string) => void
+  currentDay: DaySlotsGrouped | null
   selectedTime: string | null
-  onPickSlot: (time: string) => void
+  onPickSlot: (t: string) => void
   onConfirm: () => void
-  busy: boolean
 }) {
-  if (!currentDay) {
-    return (
-      <div className="bg-surface border-l border-gray-border p-10 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-surface-2 border border-gray-border grid place-items-center text-text-hint">
-            <Icon name="calendar" size={16} />
-          </div>
-          <div className="text-[13px] text-text-muted">Elegí un día del calendario.</div>
+  const hint = manualLocationId
+    ? 'filtrando el calendario'
+    : effectiveLocationId
+      ? 'seleccionado por la fecha'
+      : 'se selecciona al elegir fecha'
+
+  return (
+    <aside className="bg-surface border-l border-gray-border p-[26px] overflow-y-auto scrollbar-hide flex flex-col">
+      {/* Office selector */}
+      <div>
+        <div
+          className="flex justify-between items-baseline mb-[10px]"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          <span className="text-[10px] text-text-hint uppercase tracking-[0.14em]">
+            Consultorio
+          </span>
+          <span
+            className="text-[10px] text-text-hint italic"
+            style={{ fontFamily: 'var(--font-sans)' }}
+          >
+            {hint}
+          </span>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {locations.map((loc) => {
+            const meta = locationsById.get(loc.id)!
+            const isEffective = effectiveLocationId === loc.id
+            const isManual = manualLocationId === loc.id
+
+            return (
+              <button
+                key={loc.id}
+                onClick={() => onOfficeClick(loc.id)}
+                aria-pressed={isManual}
+                className={`text-left flex items-start gap-2.5 px-3 py-[11px] rounded-[10px] cursor-pointer transition-colors border ${
+                  isEffective
+                    ? 'bg-primary-light border-primary'
+                    : 'bg-surface-2 border-gray-border hover:border-gray-border-2'
+                }`}
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0 mt-[3px]"
+                  style={{ backgroundColor: meta.color }}
+                  aria-hidden
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-baseline gap-2">
+                    <div className="text-[13px] font-medium text-text">{loc.name}</div>
+                    {isManual && (
+                      <span
+                        className="text-[9px] uppercase tracking-[0.1em] text-primary bg-surface border border-primary rounded-full px-[7px] py-[2px]"
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      >
+                        Filtrando
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-text-hint mt-0.5 leading-[1.4]">
+                    {loc.address}
+                    {loc.city && `, ${loc.city}`}
+                    {loc.work_days && loc.work_days.length > 0 && ` · ${workDaysLabel(loc.work_days)}`}
+                  </div>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
-    )
-  }
 
+      <div className="h-px bg-gray-border my-5" />
+
+      {/* Empty state or horarios */}
+      {!currentDay ? <EmptyDayState /> : <DaySlotsPanel currentDay={currentDay} selectedTime={selectedTime} onPickSlot={onPickSlot} onConfirm={onConfirm} />}
+    </aside>
+  )
+}
+
+function EmptyDayState() {
+  return (
+    <div
+      className="p-6 rounded-[10px] bg-surface-2 text-center"
+      style={{ border: '1px dashed var(--color-gray-border-2, #D9D4CA)' }}
+    >
+      <div
+        className="text-[15px] italic text-text-muted"
+        style={{ fontFamily: 'var(--font-serif)' }}
+      >
+        Elegí un día
+      </div>
+      <div className="text-[12px] text-text-hint mt-1 leading-[1.55]">
+        Al tocar una fecha en el calendario, acá te mostramos los horarios disponibles y el consultorio correspondiente.
+      </div>
+    </div>
+  )
+}
+
+function DaySlotsPanel({
+  currentDay,
+  selectedTime,
+  onPickSlot,
+  onConfirm,
+}: {
+  currentDay: DaySlotsGrouped
+  selectedTime: string | null
+  onPickSlot: (t: string) => void
+  onConfirm: () => void
+}) {
   const d = new Date(currentDay.date + 'T12:00:00')
   const dayNamesShort = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
   const monthsShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
@@ -865,14 +901,13 @@ function SlotRail({
   const isToday = currentDay.date === todayISO
   const railLabel = isToday ? 'Horarios del hoy' : `Horarios del ${dow.toLowerCase()}`
 
-  // Split slots into morning (< 13:00) and afternoon (>= 13:00)
   const morning = currentDay.slots.filter((s) => parseInt(s.split(':')[0], 10) < 13)
   const afternoon = currentDay.slots.filter((s) => parseInt(s.split(':')[0], 10) >= 13)
 
   return (
-    <div className={`bg-surface border-l border-gray-border p-8 overflow-y-auto scrollbar-hide flex flex-col transition-opacity duration-200 ${busy ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
+    <div className="flex-1 flex flex-col">
       <div
-        className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1.5"
+        className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         {railLabel}
@@ -884,7 +919,7 @@ function SlotRail({
         <span className="italic">{dow}</span> {short}
       </div>
 
-      <div className="mt-6 flex-1">
+      <div className="flex-1 mt-4">
         {morning.length > 0 && (
           <SlotBlock title="Mañana" slots={morning} selectedTime={selectedTime} onPick={onPickSlot} />
         )}
@@ -893,42 +928,62 @@ function SlotRail({
         )}
       </div>
 
-      {/* Sticky CTA */}
-      <div className="sticky bottom-0 -mx-8 px-8 pt-5 pb-2 bg-surface">
+      <div className="mt-[18px] pt-4 border-t border-gray-border">
         <button
           type="button"
           onClick={onConfirm}
           disabled={!selectedTime}
-          className="w-full py-[14px] rounded-[12px] text-[14px] font-medium cursor-pointer bg-primary text-surface hover:bg-[#2F3C2D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          style={{ fontVariantNumeric: 'tabular-nums' }}
+          className="w-full py-[13px] rounded-[10px] text-[14px] font-medium cursor-pointer bg-primary text-surface hover:bg-[#2F3C2D] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
         >
-          {selectedTime ? `Continuar con ${selectedTime}` : 'Elegí un horario'}
+          {selectedTime ? (
+            <>
+              <span>Continuar con</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}>
+                {selectedTime}
+              </span>
+              <span>→</span>
+            </>
+          ) : (
+            'Elegí un horario'
+          )}
         </button>
       </div>
     </div>
   )
 }
 
-function SlotBlock({ title, slots, selectedTime, onPick, last }: { title: string; slots: string[]; selectedTime: string | null; onPick: (s: string) => void; last?: boolean }) {
+function SlotBlock({
+  title,
+  slots,
+  selectedTime,
+  onPick,
+  last,
+}: {
+  title: string
+  slots: string[]
+  selectedTime: string | null
+  onPick: (s: string) => void
+  last?: boolean
+}) {
   return (
-    <div className={last ? '' : 'mb-5'}>
+    <div className={last ? 'mt-4' : 'mt-4'}>
       <div
-        className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-2.5"
+        className="text-[10px] text-text-hint uppercase tracking-[0.12em] mb-2"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         {title}
       </div>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-3 gap-[6px]">
         {slots.map((time) => {
           const active = selectedTime === time
           return (
             <button
               key={time}
               onClick={() => onPick(time)}
-              className={`px-2 py-[11px] rounded-[8px] text-[13px] font-medium border transition-colors cursor-pointer ${
+              className={`py-[11px] text-center rounded-[8px] text-[13px] font-medium border transition-colors cursor-pointer ${
                 active
                   ? 'bg-primary text-surface border-primary'
-                  : 'bg-surface-2 border-gray-border text-text hover:bg-primary hover:text-surface hover:border-primary'
+                  : 'bg-surface-2 border-gray-border text-text hover:border-primary'
               }`}
               style={{ fontVariantNumeric: 'tabular-nums' }}
             >
@@ -941,7 +996,15 @@ function SlotBlock({ title, slots, selectedTime, onPick, last }: { title: string
   )
 }
 
-function AccordionSlotBlocks({ slots, selectedTime, onPick }: { slots: string[]; selectedTime: string | null; onPick: (s: string) => void }) {
+function AccordionSlotBlocks({
+  slots,
+  selectedTime,
+  onPick,
+}: {
+  slots: string[]
+  selectedTime: string | null
+  onPick: (s: string) => void
+}) {
   const morning = slots.filter((s) => parseInt(s.split(':')[0], 10) < 13)
   const afternoon = slots.filter((s) => parseInt(s.split(':')[0], 10) >= 13)
   return (
@@ -956,7 +1019,19 @@ function AccordionSlotBlocks({ slots, selectedTime, onPick }: { slots: string[];
   )
 }
 
-function MobileSlotBlock({ title, slots, selectedTime, onPick, last }: { title: string; slots: string[]; selectedTime: string | null; onPick: (s: string) => void; last?: boolean }) {
+function MobileSlotBlock({
+  title,
+  slots,
+  selectedTime,
+  onPick,
+  last,
+}: {
+  title: string
+  slots: string[]
+  selectedTime: string | null
+  onPick: (s: string) => void
+  last?: boolean
+}) {
   return (
     <div className={last ? '' : 'mb-3'}>
       <div
@@ -983,27 +1058,6 @@ function MobileSlotBlock({ title, slots, selectedTime, onPick, last }: { title: 
             </button>
           )
         })}
-      </div>
-    </div>
-  )
-}
-
-// Editorial busy overlay — centered, mono label + animated 3-dot sage spinner.
-function BusyOverlay({ label }: { label: string }) {
-  return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-      <div className="flex flex-col items-center gap-3 bg-surface/85 backdrop-blur-sm rounded-[14px] px-6 py-5 border border-gray-border">
-        <div className="flex gap-1.5" aria-hidden>
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" style={{ animationDelay: '0ms' }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" style={{ animationDelay: '160ms' }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" style={{ animationDelay: '320ms' }} />
-        </div>
-        <div
-          className="text-[10px] text-text-muted uppercase tracking-[0.16em]"
-          style={{ fontFamily: 'var(--font-mono)' }}
-        >
-          {label}…
-        </div>
       </div>
     </div>
   )
