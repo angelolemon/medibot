@@ -35,8 +35,14 @@ export default function PlansView({ currentPlan, userId, onClose }: Props) {
       // on successful checkout. We do this client-side because the preapproval
       // API doesn't return payer_email, so the webhook can't match the sub
       // to the user on its own.
-      const params = new URLSearchParams(window.location.search)
-      const preId = params.get('preapproval_id')
+      //
+      // Resilience: MP has been observed to glue the param with `?` instead
+      // of `&` when back_url already contains a query string — resulting in
+      // URLs like `/planes?upgrade=success?preapproval_id=X`. Normalize by
+      // regex so this edge case doesn't silently break the link flow.
+      const search = window.location.search
+      const match = search.match(/[?&]preapproval_id=([^&?]+)/)
+      const preId = match?.[1] ?? null
       if (preId) {
         setLinking(true)
         try {
