@@ -26,9 +26,18 @@ const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET ?? ''
 const SUPABASE_URL = process.env.SUPABASE_URL ?? ''
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
 
-const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-})
+let _admin: ReturnType<typeof createClient> | null = null
+function admin() {
+  if (!_admin) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing in env')
+    }
+    _admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
+    })
+  }
+  return _admin
+}
 
 // ────────────────────────────────────────────────────────────────
 // Signature verification
@@ -145,10 +154,10 @@ async function handlePreapproval(preapprovalId: string) {
   }
   if (pre.next_payment_date) update.plan_valid_until = pre.next_payment_date
 
-  const { error } = await admin.from('profiles').update(update).eq('id', userId)
+  const { error } = await admin().from('profiles').update(update).eq('id', userId)
   if (error) console.error('profile update failed', error)
 
-  await admin.from('billing_events').insert({
+  await admin().from('billing_events').insert({
     user_id: userId,
     event_type: `preapproval.${status}`,
     mp_resource_id: pre.id,
@@ -168,7 +177,7 @@ async function handlePayment(paymentId: string) {
   let userId = pay.external_reference ?? null
   const preId = pay.metadata?.preapproval_id
   if (!userId && preId) {
-    const { data } = await admin
+    const { data } = await admin()
       .from('profiles')
       .select('id')
       .eq('mp_preapproval_id', preId)
@@ -179,15 +188,15 @@ async function handlePayment(paymentId: string) {
   if (pay.status === 'approved' && userId) {
     const nextMonth = new Date()
     nextMonth.setMonth(nextMonth.getMonth() + 1)
-    await admin
+    await admin()
       .from('profiles')
       .update({ plan_valid_until: nextMonth.toISOString(), plan_status: 'active' })
       .eq('id', userId)
   } else if ((pay.status === 'rejected' || pay.status === 'refunded') && userId) {
-    await admin.from('profiles').update({ plan_status: 'past_due' }).eq('id', userId)
+    await admin().from('profiles').update({ plan_status: 'past_due' }).eq('id', userId)
   }
 
-  await admin.from('billing_events').insert({
+  await admin().from('billing_events').insert({
     user_id: userId,
     event_type: `payment.${pay.status}`,
     mp_resource_id: String(pay.id),
