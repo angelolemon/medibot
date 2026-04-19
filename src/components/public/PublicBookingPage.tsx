@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { getDoctorByBookingCode, getAvailableSlotsRange, getPublicDoctorLocations, type PublicDoctor, type PublicLocation, type DaySlots } from '../../lib/publicBooking'
 import BookingModal from './BookingModal'
 import Icon from '../Icon'
@@ -41,6 +41,8 @@ export default function PublicBookingPage({ bookingCode }: Props) {
   const [openBooking, setOpenBooking] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [pickedTime, setPickedTime] = useState<string | null>(null)
+  const [switchingLocation, setSwitchingLocation] = useState(false)
+  const firstLocationRun = useRef(true)
 
   useEffect(() => {
     (async () => {
@@ -71,10 +73,18 @@ export default function PublicBookingPage({ bookingCode }: Props) {
   // Refetch slots when the user switches location
   useEffect(() => {
     if (!doctor || !selectedLocationId) return
-    (async () => {
+    if (firstLocationRun.current) {
+      // Initial load already fetched slots in the main bootstrap effect.
+      firstLocationRun.current = false
+      return
+    }
+    setSwitchingLocation(true)
+    setPickedTime(null)
+    ;(async () => {
       const slots = await getAvailableSlotsRange(doctor.id, daysToShow, selectedLocationId)
       setAllSlots(slots)
       setSelectedDay(slots[0]?.date ?? null)
+      setSwitchingLocation(false)
     })()
   }, [selectedLocationId, doctor?.id])
 
@@ -262,6 +272,7 @@ export default function PublicBookingPage({ bookingCode }: Props) {
               onLoadMore={handleLoadMore}
               loadingMore={loadingMore}
               stepIndex={0}
+              busy={switchingLocation}
             />
             <SlotRail
               currentDay={currentDay}
@@ -272,6 +283,7 @@ export default function PublicBookingPage({ bookingCode }: Props) {
                 setSelectedSlot({ date: currentDay.date, time: pickedTime, dayLabel: currentDay.dayLabel })
                 setOpenBooking(true)
               }}
+              busy={switchingLocation}
             />
           </>
         )}
@@ -609,6 +621,7 @@ function CalendarGrid({
   onLoadMore,
   loadingMore,
   stepIndex,
+  busy,
 }: {
   allSlots: DaySlots[]
   selectedDay: string | null
@@ -618,6 +631,7 @@ function CalendarGrid({
   onLoadMore: () => Promise<void>
   loadingMore: boolean
   stepIndex: number
+  busy: boolean
 }) {
   // Build a slot-count map for quick lookup
   const slotCounts = new Map<string, number>()
@@ -658,7 +672,8 @@ function CalendarGrid({
   const steps = ['Horario', 'Datos', 'Listo']
 
   return (
-    <div className="px-10 py-9 overflow-y-auto scrollbar-hide">
+    <div className={`px-10 py-9 overflow-y-auto scrollbar-hide relative transition-opacity duration-200 ${busy ? 'opacity-60' : 'opacity-100'}`}>
+      {busy && <BusyOverlay label="Actualizando agenda" />}
       <div className="flex items-start justify-between mb-6 gap-6">
         <div>
           <div
@@ -793,11 +808,13 @@ function SlotRail({
   selectedTime,
   onPickSlot,
   onConfirm,
+  busy,
 }: {
   currentDay: DaySlots | undefined
   selectedTime: string | null
   onPickSlot: (time: string) => void
   onConfirm: () => void
+  busy: boolean
 }) {
   if (!currentDay) {
     return (
@@ -826,7 +843,8 @@ function SlotRail({
   const afternoon = currentDay.slots.filter((s) => parseInt(s.split(':')[0], 10) >= 13)
 
   return (
-    <div className="bg-surface border-l border-gray-border p-8 overflow-y-auto scrollbar-hide flex flex-col">
+    <div className={`bg-surface border-l border-gray-border p-8 overflow-y-auto scrollbar-hide flex flex-col relative transition-opacity duration-200 ${busy ? 'opacity-60' : 'opacity-100'}`}>
+      {busy && <BusyOverlay label="Actualizando horarios" />}
       <div
         className="text-[10px] text-text-hint uppercase tracking-[0.14em] mb-1.5"
         style={{ fontFamily: 'var(--font-mono)' }}
@@ -939,6 +957,27 @@ function MobileSlotBlock({ title, slots, selectedTime, onPick, last }: { title: 
             </button>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+// Editorial busy overlay — centered, mono label + animated 3-dot sage spinner.
+function BusyOverlay({ label }: { label: string }) {
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+      <div className="flex flex-col items-center gap-3 bg-surface/85 backdrop-blur-sm rounded-[14px] px-6 py-5 border border-gray-border">
+        <div className="flex gap-1.5" aria-hidden>
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" style={{ animationDelay: '0ms' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" style={{ animationDelay: '160ms' }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" style={{ animationDelay: '320ms' }} />
+        </div>
+        <div
+          className="text-[10px] text-text-muted uppercase tracking-[0.16em]"
+          style={{ fontFamily: 'var(--font-mono)' }}
+        >
+          {label}…
+        </div>
       </div>
     </div>
   )
