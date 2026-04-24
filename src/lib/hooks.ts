@@ -24,6 +24,8 @@ export interface ProfileRow {
   needs_onboarding: boolean
   booking_code: string | null
   plan: string | null
+  plan_status: string | null
+  plan_valid_until: string | null
   avatar_url: string | null
 }
 

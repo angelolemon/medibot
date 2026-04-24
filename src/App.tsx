@@ -459,6 +459,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         onSwitchOrg={handleSwitchOrg}
         onCreateOrg={handleCreateOrgAttempt}
         currentPlan={currentPlan}
+        planStatus={profile?.plan_status ?? null}
+        planValidUntil={profile?.plan_valid_until ?? null}
+        onOpenPlans={() => setShowPlans(true)}
       />
 
       {activeView === 'agenda' && (

@@ -25,9 +25,12 @@ interface Props {
   onSwitchOrg: (org: Organization | null) => void
   onCreateOrg: () => void
   currentPlan?: PlanId
+  planStatus?: string | null
+  planValidUntil?: string | null
+  onOpenPlans?: () => void
 }
 
-export default function Sidebar({ activeView, onNavigate, agendaBadge, onLogout, doctorName, doctorSub, organizations, currentOrg, isOrgAdmin, onSwitchOrg, onCreateOrg, currentPlan }: Props) {
+export default function Sidebar({ activeView, onNavigate, agendaBadge, onLogout, doctorName, doctorSub, organizations, currentOrg, isOrgAdmin, onSwitchOrg, onCreateOrg, currentPlan, planStatus, planValidUntil, onOpenPlans }: Props) {
   const showStatsLock = currentPlan ? !PLANS[currentPlan].limits.stats : false
   const [orgOpen, setOrgOpen] = useState(false)
   const orgRef = useRef<HTMLDivElement>(null)
@@ -168,8 +171,16 @@ export default function Sidebar({ activeView, onNavigate, agendaBadge, onLogout,
         )}
       </div>
 
-      {/* Brand */}
-      <div className="px-[18px] py-[14px] border-t border-gray-border">
+      {/* Brand + plan status.
+          The plan pill lives at the bottom so it's always visible but doesn't
+          compete with primary navigation. Click anywhere on the row to open
+          /planes — makes upgrade / resubscribe one tap away from every screen. */}
+      <button
+        type="button"
+        onClick={onOpenPlans}
+        disabled={!onOpenPlans}
+        className="w-full text-left px-[18px] py-[14px] border-t border-gray-border bg-transparent border-l-0 border-r-0 border-b-0 enabled:hover:bg-surface-2 enabled:cursor-pointer transition-colors disabled:cursor-default"
+      >
         {currentOrg?.logo_url ? (
           <img src={currentOrg.logo_url} alt={currentOrg.name} className="h-6 max-w-[120px] object-contain" />
         ) : (
@@ -177,10 +188,73 @@ export default function Sidebar({ activeView, onNavigate, agendaBadge, onLogout,
             MediBot
           </div>
         )}
-        <div className="text-[10px] text-text-hint mt-[2px]">
-          {currentOrg ? currentOrg.name : 'Panel profesional'}
+        <div className="mt-[3px] flex items-center gap-1.5 flex-wrap">
+          <PlanPill plan={currentPlan} status={planStatus} />
+          <PlanHint plan={currentPlan} status={planStatus} validUntil={planValidUntil} />
         </div>
-      </div>
+      </button>
     </aside>
   )
+}
+
+// ────────────────────────────────────────────────────────────────
+// Plan status chip. Kept in this file so the sidebar stays self-contained —
+// this is the only place it renders. Visual language mirrors the status
+// banner on /planes (teal = healthy, amber = wind-down, coral = failed).
+// ────────────────────────────────────────────────────────────────
+
+function PlanPill({ plan, status }: { plan?: PlanId; status?: string | null }) {
+  const label = plan ? PLANS[plan].name : 'Free'
+  // Paid + healthy = teal badge (signals active subscription).
+  // Paid + wind-down (cancelled/past_due/expired) = amber/coral so the user
+  // notices they need to act.
+  // Free = neutral chip.
+  const tone =
+    plan === 'free' || !plan
+      ? 'bg-surface-2 text-text-muted'
+      : status === 'past_due'
+        ? 'bg-coral-light text-coral'
+        : status === 'cancelled' || status === 'expired'
+          ? 'bg-amber-light text-amber'
+          : 'bg-teal-light text-teal'
+
+  return (
+    <span
+      className={`px-[7px] py-[1px] rounded-full text-[9px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap ${tone}`}
+      style={{ fontFamily: 'var(--font-mono)' }}
+    >
+      {label}
+    </span>
+  )
+}
+
+function PlanHint({
+  plan,
+  status,
+  validUntil,
+}: {
+  plan?: PlanId
+  status?: string | null
+  validUntil?: string | null
+}) {
+  if (plan === 'free' || !plan) {
+    return <span className="text-[10px] text-text-hint">Actualizar →</span>
+  }
+  if (status === 'cancelled' && validUntil) {
+    const when = new Date(validUntil).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+    return <span className="text-[10px] text-text-hint">Hasta {when}</span>
+  }
+  if (status === 'past_due') {
+    return <span className="text-[10px] text-coral">Revisar pago</span>
+  }
+  if (status === 'trialing' && validUntil) {
+    const when = new Date(validUntil).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+    return <span className="text-[10px] text-text-hint">Prueba · {when}</span>
+  }
+  if (status === 'expired') {
+    return <span className="text-[10px] text-text-hint">Vencido</span>
+  }
+  // active, healthy — just show "Panel profesional" so the layout doesn't
+  // look empty; the teal pill already tells the story.
+  return <span className="text-[10px] text-text-hint">Panel profesional</span>
 }
