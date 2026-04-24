@@ -80,7 +80,9 @@ export default function CheckoutModal({
             onReady: () => {
               if (!cancelled) setStatus('ready')
             },
-            onSubmit: async ({ formData }) => {
+            onSubmit: async (formData) => {
+              // MP's Card Payment Brick passes the tokenized card data
+              // directly as the first argument — not wrapped in { formData }.
               if (cancelled) return
               setStatus('submitting')
               setError(null)

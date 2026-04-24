@@ -1,18 +1,19 @@
 // Minimal type declarations for the MercadoPago JS SDK v2 global.
 // Only surfaces the handful of APIs we actually use — expand as needed.
 
+// The Card Payment Brick passes the form data *directly* as the first arg
+// to onSubmit — not wrapped in an outer object. Destructuring `{ formData }`
+// here will leave you with undefined, triggering
+//   "Cannot read properties of undefined (reading 'token')"
 interface MPCardPaymentOnSubmitData {
-  formData: {
-    token: string
-    payment_method_id: string
-    issuer_id?: string
-    installments?: number
-    identificationNumber?: string
-    identificationType?: string
-    payer?: {
-      email?: string
-      identification?: { type?: string; number?: string }
-    }
+  token: string
+  payment_method_id: string
+  issuer_id?: string
+  installments?: number
+  transaction_amount?: number
+  payer?: {
+    email?: string
+    identification?: { type?: string; number?: string }
   }
 }
 
