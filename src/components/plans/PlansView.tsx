@@ -50,8 +50,19 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
   }
 
   const handleChoose = (planId: PlanId) => {
-    if (planId === currentPlan) return
     setError(null)
+
+    // Clicking on the current plan is a no-op UNLESS we're in a wind-down
+    // state (cancelled / past_due / expired) — in which case it means
+    // "reactivate", opens the checkout and creates a fresh preapproval.
+    if (planId === currentPlan) {
+      const canReactivate =
+        planId !== 'free' &&
+        (state?.status === 'cancelled' ||
+          state?.status === 'past_due' ||
+          state?.status === 'expired')
+      if (!canReactivate) return
+    }
 
     if (planId === 'free') {
       setError('Para volver a Free cancelá tu plan actual desde el resumen.')
@@ -231,6 +242,15 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
                       {cancelling ? 'Cancelando…' : 'Cancelar suscripción'}
                     </button>
                   )}
+                  {(state.status === 'cancelled' || state.status === 'past_due' || state.status === 'expired') &&
+                    state.plan !== 'free' && (
+                      <button
+                        onClick={() => handleChoose(state.plan)}
+                        className="text-[12px] text-primary mt-2.5 font-medium underline hover:text-[#2F3C2D] cursor-pointer bg-transparent border-none p-0"
+                      >
+                        Reactivar {PLANS[state.plan].name} →
+                      </button>
+                    )}
                 </div>
               </div>
             </div>
@@ -312,37 +332,52 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
                   )}
                 </div>
 
-                <button
-                  onClick={() => handleChoose(id)}
-                  disabled={isCurrent || plan.price === 0}
-                  className={`w-full py-[11px] rounded-[10px] text-[13px] font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 transition-colors mb-5 inline-flex items-center justify-center gap-2 ${
-                    isCurrent
-                      ? isHighlighted
-                        ? 'bg-white/15 text-surface border border-white/20'
-                        : 'bg-surface-2 text-text-hint border border-gray-border'
-                      : isHighlighted
-                        ? 'bg-surface text-primary hover:bg-surface-2'
-                        : 'bg-primary text-surface hover:bg-[#2F3C2D]'
-                  }`}
-                >
-                  {isCurrent ? (
-                    'Plan actual'
-                  ) : plan.price === 0 ? (
-                    // Free plan CTA depends on where the user is in the
-                    // subscription lifecycle:
-                    //   - already cancelled with a future valid_until → show
-                    //     the date the downgrade will land
-                    //   - still on an active paid plan → "Se activa al cancelar"
-                    state?.status === 'cancelled' && state.validUntil
-                      ? `Se activa el ${new Date(state.validUntil).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}`
-                      : 'Se activa al cancelar'
-                  ) : (
-                    <>
-                      {plan.price > 0 && state?.status === 'past_due' ? 'Reactivar' : `Probar ${TRIAL_DAYS} días`}
-                      <span className="opacity-70">→</span>
-                    </>
-                  )}
-                </button>
+                {(() => {
+                  // CTA logic per card:
+                  //   - Current plan, active/trialing → "Plan actual" (disabled)
+                  //   - Current plan, cancelled/past_due → "Reactivar Pro"
+                  //     (enabled, opens checkout → new preapproval replaces
+                  //     the cancelled one)
+                  //   - Free card while cancelled → "Se activa el X" (disabled)
+                  //   - Free card while active → "Se activa al cancelar"
+                  //   - Other paid card → "Probar 14 días" / "Reactivar"
+                  const canReactivate =
+                    isCurrent &&
+                    plan.price > 0 &&
+                    (state?.status === 'cancelled' || state?.status === 'past_due' || state?.status === 'expired')
+                  const isActiveCurrent = isCurrent && !canReactivate
+                  const isFreeCard = plan.price === 0
+
+                  const disabled = isActiveCurrent || isFreeCard
+                  const label = isActiveCurrent
+                    ? 'Plan actual'
+                    : isFreeCard
+                      ? state?.status === 'cancelled' && state.validUntil
+                        ? `Se activa el ${new Date(state.validUntil).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}`
+                        : 'Se activa al cancelar'
+                      : canReactivate
+                        ? `Reactivar ${plan.name}`
+                        : `Probar ${TRIAL_DAYS} días`
+
+                  return (
+                    <button
+                      onClick={() => handleChoose(id)}
+                      disabled={disabled}
+                      className={`w-full py-[11px] rounded-[10px] text-[13px] font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 transition-colors mb-5 inline-flex items-center justify-center gap-2 ${
+                        isActiveCurrent
+                          ? isHighlighted
+                            ? 'bg-white/15 text-surface border border-white/20'
+                            : 'bg-surface-2 text-text-hint border border-gray-border'
+                          : isHighlighted
+                            ? 'bg-surface text-primary hover:bg-surface-2'
+                            : 'bg-primary text-surface hover:bg-[#2F3C2D]'
+                      }`}
+                    >
+                      {label}
+                      {!disabled && <span className="opacity-70">→</span>}
+                    </button>
+                  )
+                })()}
 
                 <div
                   className={`flex-1 flex flex-col gap-2.5 pt-5 border-t ${
