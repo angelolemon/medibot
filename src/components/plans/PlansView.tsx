@@ -474,6 +474,10 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
           planId={checkoutPlan}
           publicKey={MP_PUBLIC_KEY}
           payerEmail={email}
+          // Any user who's had a trial before is reactivating, not trialing
+          // again. The banner inside the modal changes its copy so the user
+          // isn't surprised when the first cobro lands the same day.
+          isReactivation={!!state?.trialEndsAt}
           onSuccess={async () => {
             const newPlan = checkoutPlan
             setCheckoutPlan(null)

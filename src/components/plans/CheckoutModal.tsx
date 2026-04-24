@@ -16,6 +16,10 @@ interface Props {
   planId: Exclude<PlanId, 'free'>
   publicKey: string
   payerEmail: string
+  /** True when the user has already used their trial — the backend will
+   *  charge immediately instead of giving another 14 free days. Surfaced so
+   *  the modal copy can be honest about what happens on Pay. */
+  isReactivation?: boolean
   onSuccess: () => void
   onClose: () => void
 }
@@ -24,6 +28,7 @@ export default function CheckoutModal({
   planId,
   publicKey,
   payerEmail,
+  isReactivation,
   onSuccess,
   onClose,
 }: Props) {
@@ -160,8 +165,16 @@ export default function CheckoutModal({
                 MediBot {plan.name}
               </div>
               <div className="text-[12px] text-text-muted mt-1">
-                {formatARS(plan.price)} / mes · 14 días gratis · cancelás cuando quieras
+                {isReactivation
+                  ? `${formatARS(plan.price)} / mes · cobro hoy · cancelás cuando quieras`
+                  : `${formatARS(plan.price)} / mes · 14 días gratis · cancelás cuando quieras`}
               </div>
+              {isReactivation && (
+                <div className="text-[11px] text-text-hint mt-2 leading-[1.55]">
+                  Ya usaste tu prueba gratis. Al confirmar te cobramos {formatARS(plan.price)} ahora
+                  y se renueva todos los meses.
+                </div>
+              )}
             </div>
             <button
               onClick={onClose}

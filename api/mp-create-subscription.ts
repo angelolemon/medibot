@@ -101,26 +101,107 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const mpPlanId = planId === 'clinic' ? MP_PLAN_ID_CLINIC : MP_PLAN_ID_PRO
   if (!mpPlanId) return res.status(500).json({ error: 'plan_not_configured' })
 
-  // Create the preapproval via API. This is the critical difference from the
-  // old redirect flow: we pass external_reference = our user_id, so every
-  // future webhook event for this sub is trivially matchable back to the user.
+  // Anti-abuse: a user who has already consumed a trial on this account
+  // shouldn't get a fresh 14 days just by cancelling and re-subscribing.
+  // We detect "has used trial" in two ways (either is sufficient):
+  //   a. profile.plan_trial_ends_at is set (we wrote it during an earlier
+  //      subscription that included a trial)
+  //   b. there is a historical preapproval.authorized event for this user
   //
-  // MP requires preapproval_plan_id + card_token_id + payer_email on creation.
-  // Any field defined on the plan (amount, frequency, trial, back_url) is
-  // inherited; we don't need to re-send them here.
+  // If yes, we skip preapproval_plan_id (which unconditionally inherits
+  // free_trial) and build auto_recurring manually, omitting free_trial —
+  // so the next cobro happens immediately on the current cycle.
+  const { data: profile } = await admin()
+    .from('profiles')
+    .select('plan_trial_ends_at')
+    .eq('id', userId!)
+    .single()
+  const profileUsedTrial = !!profile?.plan_trial_ends_at
+
+  let historicalAuthorized = false
+  if (!profileUsedTrial) {
+    const { count } = await admin()
+      .from('billing_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId!)
+      .eq('event_type', 'preapproval.authorized')
+    historicalAuthorized = (count ?? 0) > 0
+  }
+  const skipTrial = profileUsedTrial || historicalAuthorized
+
+  // Assemble the preapproval body. Two shapes:
+  //   - First-time subscribers: pass preapproval_plan_id, MP inherits amount,
+  //     frequency, free_trial, back_url from the plan config in MP dashboard.
+  //   - Re-subscribers (skipTrial): fetch the plan from MP, strip free_trial,
+  //     send auto_recurring inline. MP refuses `preapproval_plan_id` and
+  //     `auto_recurring` in the same request, so we pick one.
+  interface PreapprovalCreateBody {
+    card_token_id: string
+    payer_email: string
+    external_reference: string
+    status: 'authorized'
+    preapproval_plan_id?: string
+    reason?: string
+    back_url?: string
+    auto_recurring?: {
+      frequency: number
+      frequency_type: string
+      transaction_amount: number
+      currency_id: string
+      // Intentionally no free_trial — that's the point.
+    }
+  }
+  const createBody: PreapprovalCreateBody = {
+    card_token_id: cardToken,
+    payer_email: payerEmail,
+    external_reference: userId!,
+    status: 'authorized',
+  }
+
+  if (skipTrial) {
+    // Pull plan config so pricing stays in sync with the MP dashboard —
+    // no hardcoded numbers to drift.
+    const planRes = await fetch(
+      `https://api.mercadopago.com/preapproval_plan/${mpPlanId}`,
+      { headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` } },
+    )
+    if (!planRes.ok) {
+      console.error('MP plan fetch failed', planRes.status, await planRes.text())
+      return res.status(502).json({ error: 'plan_fetch_failed' })
+    }
+    const planData = (await planRes.json()) as {
+      reason?: string
+      back_url?: string
+      auto_recurring?: {
+        frequency: number
+        frequency_type: string
+        transaction_amount: number
+        currency_id: string
+      }
+    }
+    if (!planData.auto_recurring) {
+      return res.status(502).json({ error: 'plan_malformed' })
+    }
+    createBody.reason = planData.reason || `MediBot ${planId === 'clinic' ? 'Clinic' : 'Pro'}`
+    createBody.back_url = planData.back_url
+    createBody.auto_recurring = {
+      frequency: planData.auto_recurring.frequency,
+      frequency_type: planData.auto_recurring.frequency_type,
+      transaction_amount: planData.auto_recurring.transaction_amount,
+      currency_id: planData.auto_recurring.currency_id,
+    }
+    console.log(`reactivation (no trial) for user ${userId}, plan ${planId}`)
+  } else {
+    createBody.preapproval_plan_id = mpPlanId
+  }
+
   const mpRes = await fetch('https://api.mercadopago.com/preapproval', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      preapproval_plan_id: mpPlanId,
-      card_token_id: cardToken,
-      payer_email: payerEmail,
-      external_reference: userId,
-      status: 'authorized',
-    }),
+    body: JSON.stringify(createBody),
   })
 
   if (!mpRes.ok) {
