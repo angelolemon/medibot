@@ -21,7 +21,7 @@ interface Props {
 
 const PLAN_ORDER: PlanId[] = ['free', 'pro', 'clinic']
 
-export default function PlansView({ currentPlan, userId, onClose }: Props) {
+export default function PlansView({ currentPlan, userId, onClose, onPlanChanged }: Props) {
   const [state, setState] = useState<BillingState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
@@ -372,8 +372,13 @@ export default function PlansView({ currentPlan, userId, onClose }: Props) {
           publicKey={MP_PUBLIC_KEY}
           payerEmail={email}
           onSuccess={async () => {
+            const newPlan = checkoutPlan
             setCheckoutPlan(null)
             await refreshState()
+            // Notify the parent so the rest of the app (sidebar badge, gated
+            // features, whatever else keys off currentPlan) picks up the new
+            // plan without a manual page reload.
+            onPlanChanged?.(newPlan)
           }}
           onClose={() => setCheckoutPlan(null)}
         />
