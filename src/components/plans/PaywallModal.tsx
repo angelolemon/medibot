@@ -30,9 +30,9 @@ export default function PaywallModal({ title, description, requiredPlan, onClose
             type="button"
             onClick={(e) => { e.stopPropagation(); onClose() }}
             aria-label="Cerrar"
-            className="absolute top-4 right-4 w-8 h-8 rounded-full hover:bg-white/15 grid place-items-center cursor-pointer text-surface z-10"
+            className="absolute top-3.5 right-3.5 w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 grid place-items-center cursor-pointer text-surface z-10 transition-colors border border-white/10"
           >
-            <Icon name="x" size={14} style={{ pointerEvents: 'none' }} />
+            <Icon name="x" size={16} stroke={2.2} style={{ pointerEvents: 'none' }} />
           </button>
           <div
             className="text-[10px] uppercase tracking-[0.18em] opacity-75"
@@ -110,9 +110,9 @@ export default function PaywallModal({ title, description, requiredPlan, onClose
           </Btn>
           <button
             onClick={onClose}
-            className="w-full py-3 mt-2 text-[13px] cursor-pointer text-text-muted hover:text-text bg-transparent border-none"
+            className="w-full py-3 mt-2 text-[13px] font-medium cursor-pointer text-text hover:bg-surface-2 bg-transparent border border-gray-border rounded-[10px] transition-colors"
           >
-            Ahora no
+            ← Volver a MediBot
           </button>
         </div>
       </div>

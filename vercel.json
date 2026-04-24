@@ -1,5 +1,11 @@
 {
   "cleanUrls": true,
+  "crons": [
+    {
+      "path": "/api/cron-expire-plans",
+      "schedule": "15 3 * * *"
+    }
+  ],
   "rewrites": [
     { "source": "/ics/:code.ics", "destination": "https://wyrpnsszzlzhvhxtwlzg.supabase.co/functions/v1/ics-feed/:code.ics" },
     { "source": "/ics/:code", "destination": "https://wyrpnsszzlzhvhxtwlzg.supabase.co/functions/v1/ics-feed/:code" },
