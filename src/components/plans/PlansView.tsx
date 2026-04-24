@@ -136,46 +136,106 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
           </p>
         </div>
 
-        {/* Subscription status banner */}
-        {state && state.plan !== 'free' && (
-          <div className="max-w-[560px] mx-auto mb-10 bg-surface border border-gray-border rounded-[12px] px-5 py-4 flex items-start gap-3">
-            <div
-              className={`w-8 h-8 rounded-full grid place-items-center shrink-0 ${
-                state.status === 'past_due'
-                  ? 'bg-coral-light text-coral'
-                  : state.status === 'cancelled'
-                    ? 'bg-surface-2 text-text-hint'
-                    : 'bg-teal-light text-teal'
-              }`}
-            >
-              <Icon
-                name={state.status === 'past_due' ? 'alert' : state.status === 'cancelled' ? 'x' : 'check'}
-                size={14}
-                stroke={2}
-              />
-            </div>
-            <div className="flex-1">
-              <div className="text-[13px] font-medium text-text">
-                {PLANS[state.plan].name} · {describeStatus(state)}
-              </div>
-              {(state.status === 'active' || state.status === 'trialing') && state.preapprovalId && (
-                <button
-                  onClick={handleCancel}
-                  disabled={cancelling}
-                  className="text-[12px] text-text-hint mt-1.5 underline hover:text-coral disabled:opacity-60 cursor-pointer"
+        {/* Subscription status banner.
+            Two-line layout: plan name + status pill on top, detail copy under.
+            Icons per status are informational (clock for wind-down, alert for
+            failed payment, check for healthy) — never a × that reads as a
+            close button. */}
+        {state && state.plan !== 'free' && (() => {
+          const validUntilStr = state.validUntil
+            ? new Date(state.validUntil).toLocaleDateString('es-AR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })
+            : null
+
+          const statusStyles = {
+            trialing: {
+              icon: 'check' as const,
+              wrap: 'bg-teal-light text-teal',
+              pillBg: 'bg-teal-light',
+              pillText: 'text-teal',
+              pillLabel: 'Prueba gratis',
+            },
+            active: {
+              icon: 'check' as const,
+              wrap: 'bg-teal-light text-teal',
+              pillBg: 'bg-teal-light',
+              pillText: 'text-teal',
+              pillLabel: 'Activo',
+            },
+            cancelled: {
+              icon: 'clock' as const,
+              wrap: 'bg-amber-light text-amber',
+              pillBg: 'bg-amber-light',
+              pillText: 'text-amber',
+              pillLabel: 'Cancelado',
+            },
+            past_due: {
+              icon: 'alert' as const,
+              wrap: 'bg-coral-light text-coral',
+              pillBg: 'bg-coral-light',
+              pillText: 'text-coral',
+              pillLabel: 'Pago rechazado',
+            },
+            expired: {
+              icon: 'clock' as const,
+              wrap: 'bg-surface-2 text-text-hint',
+              pillBg: 'bg-surface-2',
+              pillText: 'text-text-hint',
+              pillLabel: 'Vencido',
+            },
+          }[state.status]
+
+          const detail =
+            state.status === 'trialing'
+              ? validUntilStr && `Tu prueba gratis termina el ${validUntilStr}. Ahí empieza el cobro mensual.`
+              : state.status === 'active'
+                ? validUntilStr && `Próximo cobro el ${validUntilStr}. Cancelás cuando quieras.`
+                : state.status === 'cancelled'
+                  ? validUntilStr && `Seguís con los beneficios hasta el ${validUntilStr}. Después volvés a Free automáticamente.`
+                  : state.status === 'past_due'
+                    ? 'Tu última renovación fue rechazada. Actualizá el medio de pago desde MercadoPago o re-suscribite abajo.'
+                    : null
+
+          return (
+            <div className="max-w-[560px] mx-auto mb-10 bg-surface border border-gray-border rounded-[14px] p-5">
+              <div className="flex items-start gap-3.5">
+                <div
+                  className={`w-9 h-9 rounded-full grid place-items-center shrink-0 ${statusStyles.wrap}`}
                 >
-                  {cancelling ? 'Cancelando…' : 'Cancelar suscripción'}
-                </button>
-              )}
-              {state.status === 'past_due' && (
-                <div className="text-[12px] text-text-muted mt-1 leading-[1.55]">
-                  Tu última renovación fue rechazada. Actualizá el medio de pago desde tu cuenta de MercadoPago o
-                  re-suscribite desde abajo.
+                  <Icon name={statusStyles.icon} size={15} stroke={2} />
                 </div>
-              )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[15px] font-medium text-text">Plan {PLANS[state.plan].name}</span>
+                    <span
+                      className={`px-2 py-[2px] rounded-full text-[10px] font-semibold uppercase tracking-[0.1em] whitespace-nowrap ${statusStyles.pillBg} ${statusStyles.pillText}`}
+                      style={{ fontFamily: 'var(--font-mono)' }}
+                    >
+                      {statusStyles.pillLabel}
+                    </span>
+                  </div>
+                  {detail && (
+                    <div className="text-[12.5px] text-text-muted mt-1.5 leading-[1.55]">
+                      {detail}
+                    </div>
+                  )}
+                  {(state.status === 'active' || state.status === 'trialing') && state.preapprovalId && (
+                    <button
+                      onClick={handleCancel}
+                      disabled={cancelling}
+                      className="text-[12px] text-text-hint mt-2.5 underline hover:text-coral disabled:opacity-60 cursor-pointer bg-transparent border-none p-0"
+                    >
+                      {cancelling ? 'Cancelando…' : 'Cancelar suscripción'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {error && (
           <div className="max-w-[560px] mx-auto mb-10 text-[13px] text-coral bg-coral-light rounded-[12px] px-4 py-3">
