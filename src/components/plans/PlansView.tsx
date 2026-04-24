@@ -108,9 +108,10 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
         {onClose && (
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full hover:bg-surface-2 grid place-items-center cursor-pointer text-text-hint"
+            className="h-9 px-3.5 rounded-[10px] border border-gray-border-2 bg-surface hover:bg-surface-2 text-[13px] font-medium text-text cursor-pointer inline-flex items-center gap-1.5 transition-colors"
           >
-            <Icon name="x" size={14} />
+            <Icon name="chevL" size={14} stroke={2} />
+            Volver a MediBot
           </button>
         )}
       </div>
