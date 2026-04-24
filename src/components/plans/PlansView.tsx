@@ -103,12 +103,27 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
       {/* Top bar */}
       <div className="bg-surface border-b border-gray-border px-6 md:px-10 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3.5">
-          <div
-            className="text-[20px] italic text-primary"
-            style={{ fontFamily: 'var(--font-serif)' }}
-          >
-            MediBot
-          </div>
+          {/* Clickable wordmark — acts as the "home" affordance, takes the
+              user back to whichever view they opened /planes from. Falls
+              back to a non-interactive span if we have no onClose handler. */}
+          {onClose ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Volver a MediBot"
+              className="text-[20px] italic text-primary bg-transparent border-none p-0 cursor-pointer hover:opacity-75 transition-opacity"
+              style={{ fontFamily: 'var(--font-serif)' }}
+            >
+              MediBot
+            </button>
+          ) : (
+            <div
+              className="text-[20px] italic text-primary"
+              style={{ fontFamily: 'var(--font-serif)' }}
+            >
+              MediBot
+            </div>
+          )}
           <span
             className="px-2.5 py-[3px] rounded-full text-[10px] font-semibold bg-amber-light text-amber uppercase tracking-[0.12em] whitespace-nowrap"
             style={{ fontFamily: 'var(--font-mono)' }}
