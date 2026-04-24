@@ -328,7 +328,14 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
                   {isCurrent ? (
                     'Plan actual'
                   ) : plan.price === 0 ? (
-                    'Se activa al cancelar'
+                    // Free plan CTA depends on where the user is in the
+                    // subscription lifecycle:
+                    //   - already cancelled with a future valid_until → show
+                    //     the date the downgrade will land
+                    //   - still on an active paid plan → "Se activa al cancelar"
+                    state?.status === 'cancelled' && state.validUntil
+                      ? `Se activa el ${new Date(state.validUntil).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })}`
+                      : 'Se activa al cancelar'
                   ) : (
                     <>
                       {plan.price > 0 && state?.status === 'past_due' ? 'Reactivar' : `Probar ${TRIAL_DAYS} días`}
