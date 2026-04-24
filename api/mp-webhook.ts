@@ -26,8 +26,13 @@ const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET ?? ''
 const SUPABASE_URL = process.env.SUPABASE_URL ?? ''
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
 
-let _admin: ReturnType<typeof createClient> | null = null
-function admin() {
+// Typed as `any` on purpose — see note in mp-create-subscription.ts. Without
+// a generated Database type, strict Supabase inference collapses untyped
+// `.from()` inserts to `never[]`, which surfaces as TS2769 at build time.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _admin: any = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function admin(): any {
   if (!_admin) {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing in env')

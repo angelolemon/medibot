@@ -20,8 +20,15 @@ const MP_PLAN_ID_CLINIC = (process.env.MP_PLAN_ID_CLINIC ?? '').trim()
 const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').trim()
 const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
 
-let _admin: ReturnType<typeof createClient> | null = null
-function admin() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _admin: any = null
+// Intentionally typed as `any` — we don't wire a generated Database type
+// through to these serverless functions, and Supabase's strict inference
+// collapses untyped `.from(table).insert(...)` calls to `never[]`, which
+// makes every insert a type error. Shape validation happens at the handler
+// level (we construct the literals ourselves), so the runtime is safe.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function admin(): any {
   if (!_admin) {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing')

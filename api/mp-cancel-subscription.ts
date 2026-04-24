@@ -10,8 +10,12 @@ const MP_ACCESS_TOKEN = (process.env.MP_ACCESS_TOKEN ?? '').trim()
 const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').trim()
 const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
 
-let _admin: ReturnType<typeof createClient> | null = null
-function admin() {
+// See note in mp-create-subscription.ts — typed as `any` to dodge Supabase's
+// `never[]` inference on untyped `.from()` inserts.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _admin: any = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function admin(): any {
   if (!_admin) {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing')
