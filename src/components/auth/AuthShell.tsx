@@ -17,7 +17,7 @@ export default function AuthShell({ children }: { children: ReactNode }) {
             className="text-[28px] italic tracking-[-0.02em]"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
-            MediBot
+            Tecito
           </div>
           <div
             className="text-[11px] opacity-55 uppercase tracking-[0.12em]"

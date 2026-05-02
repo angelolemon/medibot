@@ -112,7 +112,7 @@ export default function PaywallModal({ title, description, requiredPlan, onClose
             onClick={onClose}
             className="w-full py-3 mt-2 text-[13px] font-medium cursor-pointer text-text hover:bg-surface-2 bg-transparent border border-gray-border rounded-[10px] transition-colors"
           >
-            ← Volver a MediBot
+            ← Volver a Tecito
           </button>
         </div>
       </div>

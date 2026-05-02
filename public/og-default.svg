@@ -35,7 +35,7 @@
   <!-- Footer row -->
   <text x="80" y="568" font-family="'Inter', system-ui, sans-serif"
         font-size="22" fill="#2A2D26">
-    medibot.ar
+    tecito.com.ar
   </text>
   <text x="80" y="598" font-family="'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace"
         font-size="14" letter-spacing="1.5" fill="#6B685E">
@@ -49,7 +49,7 @@
           font-size="96" font-style="italic" fill="#3B4A38">M</text>
   </g>
   <text x="990" y="420" text-anchor="middle" font-family="'Newsreader', serif"
-        font-size="28" font-style="italic" fill="#F5F2EC">MediBot</text>
+        font-size="28" font-style="italic" fill="#F5F2EC">Tecito</text>
   <text x="990" y="460" text-anchor="middle" font-family="'Geist Mono', monospace"
         font-size="13" letter-spacing="2" fill="#A8B1A2">AR · 2026</text>
 </svg>

@@ -188,7 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     payer_email: payerEmail,
     external_reference: userId!,
     status: 'authorized',
-    reason: planData.reason || `MediBot ${planId === 'clinic' ? 'Clinic' : 'Pro'}`,
+    reason: planData.reason || `Tecito ${planId === 'clinic' ? 'Clinic' : 'Pro'}`,
     back_url: planData.back_url,
     auto_recurring: {
       frequency: planData.auto_recurring.frequency,

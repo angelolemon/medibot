@@ -69,7 +69,7 @@ const defaultTemplates: Record<string, string> = {
   cancel_confirm: '❌ Tu turno del *{fecha}* a las *{hora} hs* fue cancelado.\n\nSi querés reagendar, respondé *"turno"*.',
   patient_confirm: '✅ Perfecto! Tu turno del *{fecha}* a las *{hora} hs* quedó confirmado.\n\n¡Te esperamos!',
   talk_to_doctor: '📩 Entendido. Le aviso a {doctor} y te va a contactar a la brevedad.\n\nSi es urgente, llamá al consultorio.',
-  unknown_patient: 'Hola! Soy el asistente virtual de MediBot.\n\nNo encontré tu número registrado. Contactá al consultorio para que te agreguen como paciente.',
+  unknown_patient: 'Hola! Soy el asistente virtual de Tecito.\n\nNo encontré tu número registrado. Contactá al consultorio para que te agreguen como paciente.',
   default_reply: 'No entendí tu mensaje. Podés escribir:\n\n1️⃣ *turno* - para agendar\n2️⃣ *próximo* - para ver tu turno\n3️⃣ *cancelar* - para cancelar\n4️⃣ *hablar* - para contactar al profesional',
 };
 
@@ -434,7 +434,7 @@ async function handleMessage(from: string, body: string): Promise<string> {
   if (!result) {
     // Start onboarding
     await setSession(from, "onboard_name", {});
-    return "Hola! Soy el asistente de MediBot. Decime tu nombre y apellido.";
+    return "Hola! Soy el asistente de Tecito. Decime tu nombre y apellido.";
   }
 
   return handleExistingPatient(from, text, result);
@@ -586,12 +586,12 @@ Deno.serve(async (req) => {
     const mode = url.searchParams.get("hub.mode");
     const token = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
-    const verifyToken = Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "medibot-verify";
+    const verifyToken = Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "tecito-verify";
 
     if (mode === "subscribe" && token === verifyToken) {
       return new Response(challenge, { status: 200 });
     }
-    return new Response("MediBot WhatsApp Bot activo", { status: 200 });
+    return new Response("Tecito WhatsApp Bot activo", { status: 200 });
   }
 
   // POST - incoming message

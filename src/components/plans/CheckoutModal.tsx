@@ -162,7 +162,7 @@ export default function CheckoutModal({
                 className="text-[22px] italic text-primary tracking-[-0.015em] mt-1"
                 style={{ fontFamily: 'var(--font-serif)' }}
               >
-                MediBot {plan.name}
+                Tecito {plan.name}
               </div>
               <div className="text-[12px] text-text-muted mt-1">
                 {isReactivation

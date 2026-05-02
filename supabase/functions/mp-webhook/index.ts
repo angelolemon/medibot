@@ -112,7 +112,7 @@ interface MPPayment {
 // ────────────────────────────────────────────────────────────────
 // Plan derivation
 //
-// Given the preapproval's reason (we set it to "MediBot Pro" / "MediBot Clinic")
+// Given the preapproval's reason (we set it to "Tecito Pro" / "Tecito Clinic")
 // we figure out which plan to assign. This keeps us from maintaining a
 // plan_id → reason mapping DB-side.
 // ────────────────────────────────────────────────────────────────

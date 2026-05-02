@@ -218,7 +218,7 @@ export default function DoctorProfileView({ onLogout, onOpenPlans }: Props) {
           <div className="bg-white border border-gray-border rounded-[14px] p-5 md:col-span-2">
             <div className="text-[13px] font-semibold mb-1">Sincronizar con tu calendario</div>
             <div className="text-xs text-text-muted mb-4">
-              Ves tus turnos junto con el resto de tus eventos en Google Calendar, Apple Calendar u Outlook. Los cambios que hagas en MediBot se reflejan automáticamente cada pocas horas.
+              Ves tus turnos junto con el resto de tus eventos en Google Calendar, Apple Calendar u Outlook. Los cambios que hagas en Tecito se reflejan automáticamente cada pocas horas.
             </div>
             <CalendarSync bookingCode={profile?.booking_code || null} />
           </div>
@@ -478,7 +478,7 @@ function CalendarSync({ bookingCode }: { bookingCode: string | null }) {
       </div>
 
       <div className="mt-4 text-[11px] text-text-hint leading-[1.5]">
-        Es <strong>read-only</strong>: ves tus turnos en el calendario pero no podés editarlos desde ahí. MediBot es la fuente de verdad.
+        Es <strong>read-only</strong>: ves tus turnos en el calendario pero no podés editarlos desde ahí. Tecito es la fuente de verdad.
       </div>
     </div>
   )

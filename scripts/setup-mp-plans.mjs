@@ -1,4 +1,4 @@
-// One-shot helper to create the MP preapproval_plans for MediBot.
+// One-shot helper to create the MP preapproval_plans for Tecito.
 //
 // Usage:
 //   ACCESS_TOKEN="APP_USR-..." node scripts/setup-mp-plans.mjs
@@ -52,11 +52,11 @@ async function createPlan({ reason, amount }) {
 
 console.log('◇ Creando planes en MercadoPago…\n')
 
-const pro = await createPlan({ reason: 'MediBot Pro', amount: 18000 })
+const pro = await createPlan({ reason: 'Tecito Pro', amount: 18000 })
 if (!pro) process.exit(1)
 console.log(`✓ Pro creado`)
 
-const clinic = await createPlan({ reason: 'MediBot Clinic', amount: 45000 })
+const clinic = await createPlan({ reason: 'Tecito Clinic', amount: 45000 })
 if (!clinic) process.exit(1)
 console.log(`✓ Clinic creado\n`)
 

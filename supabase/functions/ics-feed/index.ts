@@ -1,4 +1,4 @@
-// MediBot — ICS feed endpoint.
+// Tecito — ICS feed endpoint.
 // Serves each doctor's calendar as an iCalendar file that Google Calendar,
 // Apple Calendar, Outlook, etc. can subscribe to.
 //
@@ -128,19 +128,19 @@ Deno.serve(async (req) => {
   }
 
   const doctorName = `${doctor.first_name ?? ""} ${doctor.last_name ?? ""}`.trim() || "Profesional";
-  const calName = `MediBot - ${doctorName}`;
+  const calName = `Tecito - ${doctorName}`;
   const location = [doctor.address, doctor.city].filter(Boolean).join(", ");
   const defaultDuration = Number(doctor.session_duration) || 50;
 
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//MediBot//ES",
+    "PRODID:-//Tecito//ES",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     `X-WR-CALNAME:${icsEscape(calName)}`,
     "X-WR-TIMEZONE:America/Argentina/Buenos_Aires",
-    `X-WR-CALDESC:${icsEscape("Turnos de " + doctorName + " - MediBot")}`,
+    `X-WR-CALDESC:${icsEscape("Turnos de " + doctorName + " - Tecito")}`,
     "X-PUBLISHED-TTL:PT1H",
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
   ];
@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
 
     lines.push(
       "BEGIN:VEVENT",
-      `UID:${a.id}@medibot`,
+      `UID:${a.id}@tecito`,
       `DTSTAMP:${dtstamp}`,
       `DTSTART:${dtstart}`,
       `DTEND:${dtend}`,
@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
     headers: {
       ...corsHeaders,
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": `inline; filename="medibot-${code}.ics"`,
+      "Content-Disposition": `inline; filename="tecito-${code}.ics"`,
       "Cache-Control": "public, max-age=600", // 10 min, calendar apps usually re-fetch on their own schedule
     },
   });

@@ -44,7 +44,7 @@ export default function Sidebar({ activeView, onNavigate, agendaBadge, onLogout,
   }, [])
 
   const isOrg = !!currentOrg
-  const displayName = isOrg ? currentOrg.name : (doctorName || 'MediBot')
+  const displayName = isOrg ? currentOrg.name : (doctorName || 'Tecito')
   const displaySub = isOrg ? (isOrgAdmin ? 'Admin' : 'Miembro') : (doctorSub || 'Personal')
   const initials = isOrg
     ? currentOrg.name[0].toUpperCase()
@@ -185,7 +185,7 @@ export default function Sidebar({ activeView, onNavigate, agendaBadge, onLogout,
           <img src={currentOrg.logo_url} alt={currentOrg.name} className="h-6 max-w-[120px] object-contain" />
         ) : (
           <div className="text-[16px] italic text-primary" style={{ fontFamily: 'var(--font-serif)' }}>
-            MediBot
+            Tecito
           </div>
         )}
         <div className="mt-[3px] flex items-center gap-1.5 flex-wrap">

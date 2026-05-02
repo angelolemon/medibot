@@ -40,7 +40,7 @@ export default function JoinOrgView({ inviteCode, onJoined, onSkip }: Props) {
     <div className="min-h-screen bg-gray-bg flex items-center justify-center p-4">
       <div className="w-full max-w-[420px]">
         <div className="text-center mb-8">
-          <div className="text-2xl font-semibold text-primary mb-1">MediBot</div>
+          <div className="text-2xl font-semibold text-primary mb-1">Tecito</div>
           <div className="text-sm text-text-hint">Panel profesional</div>
         </div>
 
@@ -48,7 +48,7 @@ export default function JoinOrgView({ inviteCode, onJoined, onSkip }: Props) {
           <div className="text-4xl mb-4">🏥</div>
           <div className="text-lg font-semibold mb-2">Te invitaron a una organizacion</div>
           <div className="text-sm text-text-muted mb-6">
-            Alguien te invito a unirte a su consultorio en MediBot. Al aceptar, vas a aparecer como medico dentro de su organizacion.
+            Alguien te invito a unirte a su consultorio en Tecito. Al aceptar, vas a aparecer como medico dentro de su organizacion.
           </div>
 
           {error && (

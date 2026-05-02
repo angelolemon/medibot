@@ -172,7 +172,7 @@ export default function BookingModal({ doctor, slot, location, onClose, onSucces
               className="text-[15px] italic font-medium text-text leading-[1.1]"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-              MediBot
+              Tecito
             </div>
             <div
               className="text-[9px] text-text-hint uppercase tracking-[0.14em] mt-0.5"

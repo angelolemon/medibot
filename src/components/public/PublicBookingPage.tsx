@@ -184,13 +184,13 @@ export default function PublicBookingPage({ bookingCode }: Props) {
               className="text-[16px] italic text-text font-medium cursor-pointer"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-              MediBot
+              Tecito
             </a>
             <div
               className="hidden sm:block text-[11px] text-text-hint"
               style={{ fontFamily: 'var(--font-mono)' }}
             >
-              medibot.ar/{doctor.last_name?.toLowerCase().replace(/\s+/g, '-') || bookingCode}
+              tecito.com.ar/{doctor.last_name?.toLowerCase().replace(/\s+/g, '-') || bookingCode}
             </div>
           </div>
           <div

@@ -110,18 +110,18 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
             <button
               type="button"
               onClick={onClose}
-              aria-label="Volver a MediBot"
+              aria-label="Volver a Tecito"
               className="text-[20px] italic text-primary bg-transparent border-none p-0 cursor-pointer hover:opacity-75 transition-opacity"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-              MediBot
+              Tecito
             </button>
           ) : (
             <div
               className="text-[20px] italic text-primary"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-              MediBot
+              Tecito
             </div>
           )}
           <span
@@ -137,7 +137,7 @@ export default function PlansView({ currentPlan, userId, onClose, onPlanChanged 
             className="h-9 px-3.5 rounded-[10px] border border-gray-border-2 bg-surface hover:bg-surface-2 text-[13px] font-medium text-text cursor-pointer inline-flex items-center gap-1.5 transition-colors"
           >
             <Icon name="chevL" size={14} stroke={2} />
-            Volver a MediBot
+            Volver a Tecito
           </button>
         )}
       </div>

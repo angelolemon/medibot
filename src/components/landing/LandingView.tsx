@@ -772,33 +772,55 @@ function Pricing({ onGoToRegister }: { onGoToRegister: () => void }) {
 
         <div className="grid lg:grid-cols-3 grid-cols-1 gap-4">
           <Plan
-            name="Solo"
-            price="$9.900"
-            period="por mes · un profesional"
-            desc="Para profesionales independientes que atienden solos."
-            features={['Agenda online ilimitada', 'Hasta 200 turnos por mes', 'Recordatorios por WhatsApp', 'Ficha de paciente', 'Soporte por mail']}
-            cta="Empezar 14 días gratis"
+            name="Free"
+            price="$0"
+            period="para siempre · 1 profesional"
+            desc="Para empezar."
+            features={[
+              'Hasta 10 pacientes',
+              'Agenda web completa',
+              'Link público de reservas',
+              'Recordatorios manuales por WhatsApp',
+              '1 profesional',
+              'Soporte por email',
+            ]}
+            cta="Empezar gratis"
             onCtaClick={onGoToRegister}
           />
           <Plan
-            name="Consultorio"
-            price="$24.900"
-            period="por mes · hasta 5 profesionales"
-            desc="Para consultorios y clínicas pequeñas con varios profesionales."
-            features={['Todo lo del plan Solo', 'Hasta 5 profesionales', 'Turnos ilimitados', 'Vista por médico y por servicio', 'Estadísticas y reportes', 'Soporte prioritario']}
-            cta="Empezar 14 días gratis"
+            name="Pro"
+            price="$18.000"
+            period="por mes · 1 profesional"
+            desc="Para profesionales independientes."
+            features={[
+              'Todo lo de Free',
+              'Pacientes ilimitados',
+              'Marca propia: logo y colores',
+              'Link público con tu identidad',
+              'Estadísticas completas',
+              'Soporte prioritario',
+            ]}
+            cta="Probar 14 días gratis"
             featured
             tag="Más elegido"
             onCtaClick={onGoToRegister}
           />
           <Plan
-            name="Clínica"
-            price="A medida"
-            period="desde 6 profesionales"
-            desc="Para clínicas grandes que necesitan integraciones y soporte dedicado."
-            features={['Todo lo del plan Consultorio', 'Profesionales ilimitados', 'Multi-sede', 'API e integraciones', 'Onboarding asistido', 'Soporte dedicado']}
-            cta="Hablar con ventas"
-            onCtaClick={() => { window.location.href = 'mailto:hola@tecito.com.ar?subject=Plan%20Cl%C3%ADnica' }}
+            name="Clinic"
+            price="$45.000"
+            period="por mes · hasta 10 profesionales"
+            desc="Para consultorios y clínicas."
+            features={[
+              'Todo lo de Pro',
+              'Hasta 10 profesionales',
+              'Agenda centralizada del consultorio',
+              'Panel de administración',
+              'Invitar y gestionar médicos',
+              'Estadísticas por profesional y globales',
+              'Soporte prioritario',
+            ]}
+            cta="Probar 14 días gratis"
+            onCtaClick={onGoToRegister}
           />
         </div>
 

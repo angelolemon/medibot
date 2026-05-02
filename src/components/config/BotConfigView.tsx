@@ -72,7 +72,7 @@ const templateConfigs: TemplateConfig[] = [
     key: 'unknown_patient',
     trigger: 'Número no registrado',
     triggerLabel: 'Paciente no encontrado',
-    defaultMessage: 'Hola! Soy el asistente virtual de MediBot.\n\nNo encontré tu número registrado. Contactá al consultorio para que te agreguen como paciente.',
+    defaultMessage: 'Hola! Soy el asistente virtual de Tecito.\n\nNo encontré tu número registrado. Contactá al consultorio para que te agreguen como paciente.',
     category: 'respuestas',
   },
   {

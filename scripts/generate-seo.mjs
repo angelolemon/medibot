@@ -54,10 +54,10 @@ const SITE_URL = (process.env.VITE_SITE_URL || 'https://panel-medico-pied.vercel
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL
 const SUPABASE_ANON = process.env.VITE_SUPABASE_ANON_KEY
 
-const SITE_NAME = 'MediBot'
+const SITE_NAME = 'Tecito'
 const SITE_TAGLINE = 'Turnos online y agenda para profesionales de la salud'
 const SITE_DESC =
-  'MediBot es la agenda online para médicos y psicólogos. Tus pacientes reservan turnos desde un link único, recibís recordatorios por WhatsApp y gestionás tu consultorio en un panel simple.'
+  'Tecito es la agenda online para médicos y psicólogos. Tus pacientes reservan turnos desde un link único, recibís recordatorios por WhatsApp y gestionás tu consultorio en un panel simple.'
 
 // ───────────────────────────────────────────────────────────────
 // Utilities
@@ -139,8 +139,8 @@ async function generateRasterAssets() {
 
 async function generateManifest() {
   const manifest = {
-    name: 'MediBot',
-    short_name: 'MediBot',
+    name: 'Tecito',
+    short_name: 'Tecito',
     description: SITE_DESC,
     start_url: '/',
     display: 'standalone',
@@ -217,7 +217,7 @@ function renderDoctorHead({ doctor, url }) {
   const fullName = `${doctor.first_name} ${doctor.last_name}`.trim()
   const specialty = doctor.specialty ? doctor.specialty.trim() : 'Profesional de la salud'
 
-  const title = clamp(`Reservá turno con ${fullName} · ${specialty} — MediBot`, 60)
+  const title = clamp(`Reservá turno con ${fullName} · ${specialty} — Tecito`, 60)
   const bioSeed = doctor.bio
     ? ` ${doctor.bio.replace(/\s+/g, ' ').trim()}`
     : ''
@@ -270,7 +270,7 @@ function renderDoctorHead({ doctor, url }) {
     <meta property="og:image" content="${ogImage}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Reservá turno con ${escapeHTML(fullName)} en MediBot" />
+    <meta property="og:image:alt" content="Reservá turno con ${escapeHTML(fullName)} en Tecito" />
     <meta property="og:locale" content="es_AR" />
     <meta property="profile:first_name" content="${escapeHTML(doctor.first_name || '')}" />
     <meta property="profile:last_name" content="${escapeHTML(doctor.last_name || '')}" />
@@ -347,7 +347,7 @@ async function writeDoctorPage(templateHtml, doctor) {
   // Replace <title> to avoid leaving the homepage one in place.
   const fullName = `${doctor.first_name} ${doctor.last_name}`.trim()
   const specialty = doctor.specialty ? doctor.specialty.trim() : 'Profesional de la salud'
-  const title = clamp(`Reservá turno con ${fullName} · ${specialty} — MediBot`, 60)
+  const title = clamp(`Reservá turno con ${fullName} · ${specialty} — Tecito`, 60)
 
   const html = applyHeadReplacements(stripped, {
     title,
@@ -404,7 +404,7 @@ async function generateSitemap(doctors) {
 async function writeNotFound(templateHtml) {
   const stripped = stripSocialAndStructuredData(templateHtml)
   const html = applyHeadReplacements(stripped, {
-    title: 'Página no encontrada — MediBot',
+    title: 'Página no encontrada — Tecito',
     description: 'La página que buscás no existe o fue movida. Volvé al inicio.',
     canonical: `${SITE_URL}/404`,
     robots: 'noindex,follow',

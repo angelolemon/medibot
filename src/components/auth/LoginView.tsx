@@ -78,7 +78,7 @@ export default function LoginView({ onLoginSuccess, onGoToRegister }: Props) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="dra.carrizo@medibot.ar"
+            placeholder="dra.carrizo@tecito.com.ar"
             className="w-full px-3.5 py-[11px] rounded-[10px] border border-gray-border-2 bg-surface text-[14px] text-text focus:border-primary-mid"
           />
         </div>
