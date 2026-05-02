@@ -19,6 +19,7 @@ import PaywallModal from './components/plans/PaywallModal'
 import { canAddPatient, canCreateOrg, canCustomBranding, PLANS, type PlanId } from './lib/plans'
 import LoginView from './components/auth/LoginView'
 import RegisterView from './components/auth/RegisterView'
+import LandingView from './components/landing/LandingView'
 import OrgAdminView from './components/org/OrgAdminView'
 import JoinOrgView from './components/org/JoinOrgView'
 import CreateOrgModal from './components/org/CreateOrgModal'
@@ -31,7 +32,7 @@ import PageHeader from './components/PageHeader'
 import NewAppointmentModal from './components/agenda/NewAppointmentModal'
 import RemindersModal from './components/agenda/RemindersModal'
 
-type AuthScreen = 'loading' | 'login' | 'register' | 'onboarding' | 'join-org' | 'app' | 'public-booking' | 'not-found'
+type AuthScreen = 'loading' | 'landing' | 'login' | 'register' | 'onboarding' | 'join-org' | 'app' | 'public-booking' | 'not-found'
 type AgendaMode = 'week' | 'month'
 
 export default function App() {
@@ -66,12 +67,22 @@ export default function App() {
       window.history.replaceState({}, '', window.location.pathname)
     }
 
+    // For unauthenticated users: /login → LoginView, /register → RegisterView,
+    // anything else (including /) → marketing landing. We let /login and
+    // /register persist in the URL during dev too, so a refresh lands you
+    // back on the same screen instead of bouncing to the landing.
+    const unauthScreenForPath = (path: string): AuthScreen => {
+      if (path === '/login') return 'login'
+      if (path === '/register') return 'register'
+      return 'landing'
+    }
+
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         loadProfile(session.user.id)
       } else {
-        setAuthScreen('login')
+        setAuthScreen(unauthScreenForPath(pathname))
       }
     })
 
@@ -80,7 +91,7 @@ export default function App() {
       if (session) {
         loadProfile(session.user.id)
       } else {
-        setAuthScreen('login')
+        setAuthScreen(unauthScreenForPath(window.location.pathname))
       }
     })
 
@@ -128,9 +139,20 @@ export default function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    setAuthScreen('login')
+    window.history.pushState({}, '', '/')
+    setAuthScreen('landing')
     setUserFirstName('')
     setUserLastName('')
+  }
+
+  const goToLogin = () => {
+    window.history.pushState({}, '', '/login')
+    setAuthScreen('login')
+  }
+
+  const goToRegister = () => {
+    window.history.pushState({}, '', '/register')
+    setAuthScreen('register')
   }
 
   if (authScreen === 'public-booking' && publicBookingCode) {
@@ -145,19 +167,23 @@ export default function App() {
     return (
       <div className="min-h-screen bg-gray-bg flex items-center justify-center">
         <div className="text-center">
-          <div className="text-2xl font-semibold text-primary mb-2">MediBot</div>
+          <div className="text-2xl font-semibold text-primary mb-2" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>Tecito</div>
           <div className="text-sm text-text-hint">Cargando...</div>
         </div>
       </div>
     )
   }
 
+  if (authScreen === 'landing') {
+    return <LandingView onGoToLogin={goToLogin} onGoToRegister={goToRegister} />
+  }
+
   if (authScreen === 'login') {
-    return <LoginView onLoginSuccess={handleLoginSuccess} onGoToRegister={() => setAuthScreen('register')} />
+    return <LoginView onLoginSuccess={handleLoginSuccess} onGoToRegister={goToRegister} />
   }
 
   if (authScreen === 'register') {
-    return <RegisterView onRegisterSuccess={handleRegisterSuccess} onGoToLogin={() => setAuthScreen('login')} />
+    return <RegisterView onRegisterSuccess={handleRegisterSuccess} onGoToLogin={goToLogin} />
   }
 
   if (authScreen === 'onboarding') {
