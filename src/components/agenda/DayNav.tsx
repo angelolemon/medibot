@@ -47,7 +47,7 @@ export default function DayNav({ days, selectedDate, blockedDates, onSelect, onP
             <button
               key={d.date}
               onClick={() => onSelect(d.date)}
-              className={`text-left px-3.5 py-3 rounded-[10px] cursor-pointer border transition-colors ${
+              className={`text-left px-3.5 py-3 rounded-[10px] cursor-pointer border transition-colors min-h-[5.25rem] ${
                 isSelected
                   ? 'bg-primary text-surface border-primary'
                   : isBlocked
@@ -66,16 +66,15 @@ export default function DayNav({ days, selectedDate, blockedDates, onSelect, onP
               >
                 {dayNum}
               </div>
-              {count != null && count > 0 && (
-                <div className={`text-[10px] mt-1 ${isSelected ? 'opacity-65' : 'opacity-65'}`} style={{ fontFamily: 'var(--font-mono)' }}>
-                  {count} {count === 1 ? 'turno' : 'turnos'}
-                </div>
-              )}
-              {isBlocked && !isSelected && (
+              {isBlocked && !isSelected ? (
                 <div className="text-[10px] mt-1 opacity-75" style={{ fontFamily: 'var(--font-mono)' }}>
                   bloqueado
                 </div>
-              )}
+              ) : count != null && count > 0 ? (
+                <div className={`text-[10px] mt-1 ${isSelected ? 'opacity-65' : 'opacity-65'}`} style={{ fontFamily: 'var(--font-mono)' }}>
+                  {count} {count === 1 ? 'turno' : 'turnos'}
+                </div>
+              ) : null}
             </button>
           )
         })}
